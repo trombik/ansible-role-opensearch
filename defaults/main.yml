@@ -1,22 +1,22 @@
 ---
-opendistroforelasticsearch_user: "{{ __opendistroforelasticsearch_user }}"
-opendistroforelasticsearch_group: "{{ __opendistroforelasticsearch_group }}"
-opendistroforelasticsearch_log_dir: "{{ __opendistroforelasticsearch_log_dir }}"
-opendistroforelasticsearch_db_dir: "{{ __opendistroforelasticsearch_db_dir }}"
-opendistroforelasticsearch_scripts_dir: "{{ __opendistroforelasticsearch_scripts_dir }}"
-opendistroforelasticsearch_plugins_dir: "{{ __opendistroforelasticsearch_plugins_dir }}"
-opendistroforelasticsearch_plugin_command: "{{ __opendistroforelasticsearch_plugin_command }}"
-opendistroforelasticsearch_plugins: []
-opendistroforelasticsearch_service: "{{ __opendistroforelasticsearch_service }}"
-opendistroforelasticsearch_package: "{{ __opendistroforelasticsearch_package }}"
-opendistroforelasticsearch_extra_packages: []
-opendistroforelasticsearch_conf_dir: "{{ __opendistroforelasticsearch_conf_dir }}"
-opendistroforelasticsearch_jvm_options: ""
-opendistroforelasticsearch_conf_file: "{{ opendistroforelasticsearch_conf_dir }}/elasticsearch.yml"
-opendistroforelasticsearch_flags: ""
-opendistroforelasticsearch_config: ""
-opendistroforelasticsearch_config_log4j2_properties: ""
-opendistroforelasticsearch_http_port: 9200
-opendistroforelasticsearch_java_home: "{{ __opendistroforelasticsearch_java_home }}"
-opendistroforelasticsearch_extra_plugin_files: []
-opendistroforelasticsearch_include_role_x509_certificate: yes
+opensearch_user: "{{ __opensearch_user }}"
+opensearch_group: "{{ __opensearch_group }}"
+opensearch_log_dir: "{{ __opensearch_log_dir }}"
+opensearch_db_dir: "{{ __opensearch_db_dir }}"
+opensearch_scripts_dir: "{{ __opensearch_scripts_dir }}"
+opensearch_plugins_dir: "{{ __opensearch_plugins_dir }}"
+opensearch_plugin_command: "{{ __opensearch_plugin_command }}"
+opensearch_plugins: []
+opensearch_service: "{{ __opensearch_service }}"
+opensearch_package: "{{ __opensearch_package }}"
+opensearch_extra_packages: []
+opensearch_conf_dir: "{{ __opensearch_conf_dir }}"
+opensearch_jvm_options: ""
+opensearch_conf_file: "{{ opensearch_conf_dir }}/opensearch.yml"
+opensearch_flags: ""
+opensearch_config: ""
+opensearch_config_log4j2_properties: ""
+opensearch_http_port: 9200
+opensearch_java_home: "{{ __opensearch_java_home }}"
+opensearch_extra_plugin_files: []
+opensearch_include_role_x509_certificate: yes

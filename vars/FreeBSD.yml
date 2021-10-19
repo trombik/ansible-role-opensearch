@@ -1,12 +1,12 @@
 ---
-__opendistroforelasticsearch_user: elasticsearch
-__opendistroforelasticsearch_group: elasticsearch
-__opendistroforelasticsearch_log_dir: /var/log/elasticsearch
-__opendistroforelasticsearch_db_dir: /var/db/elasticsearch
-__opendistroforelasticsearch_package: textproc/opendistroforelasticsearch
-__opendistroforelasticsearch_conf_dir: /usr/local/etc/elasticsearch
-__opendistroforelasticsearch_scripts_dir: ""
-__opendistroforelasticsearch_plugins_dir: "/usr/local/lib/elasticsearch/plugins"
-__opendistroforelasticsearch_plugin_command: /usr/local/lib/elasticsearch/bin/elasticsearch-plugin
-__opendistroforelasticsearch_service: elasticsearch
-__opendistroforelasticsearch_java_home: /usr/local
+__opensearch_user: opensearch
+__opensearch_group: opensearch
+__opensearch_log_dir: /var/log/opensearch
+__opensearch_db_dir: /var/db/opensearch
+__opensearch_package: textproc/opensearch
+__opensearch_conf_dir: /usr/local/etc/opensearch
+__opensearch_scripts_dir: ""
+__opensearch_plugins_dir: "/usr/local/lib/opensearch/plugins"
+__opensearch_plugin_command: /usr/local/lib/opensearch/bin/opensearch-plugin
+__opensearch_service: opensearch
+__opensearch_java_home: /usr/local

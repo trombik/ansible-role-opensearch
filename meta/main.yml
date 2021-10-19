@@ -1,8 +1,8 @@
 ---
 galaxy_info:
-  role_name: opendistroforelasticsearch
+  role_name: opensearch
   author: Tomoyuki Sakurai
-  description: Configures opendistroforelasticsearch
+  description: Configures opensearch
   company: N/A
   license: BSD
   min_ansible_version: 2.0
@@ -18,4 +18,4 @@ galaxy_info:
       versions:
         - 7
   galaxy_tags:
-    - elasticsearch
+    - opensearch

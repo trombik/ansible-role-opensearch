@@ -1,12 +1,12 @@
 ---
 
-- name: Restart opendistroforelasticsearch
+- name: Restart opensearch
   service:
-    name: "{{ opendistroforelasticsearch_service }}"
+    name: "{{ opensearch_service }}"
     state: restarted
-  notify: Wait for elasticsearch to start in handler
+  notify: Wait for opensearch to start in handler
 
-- name: Wait for elasticsearch to start in handler
+- name: Wait for opensearch to start in handler
   wait_for:
     host: localhost
-    port: "{{ opendistroforelasticsearch_http_port }}"
+    port: "{{ opensearch_http_port }}"

@@ -1,5 +1,5 @@
 ---
-# tasks file for ansible-role-elasticsearch
+# tasks file for ansible-role-opensearch
 
 - name: "Include {{ ansible_os_family }}.yml"
   include_vars: "{{ ansible_os_family }}.yml"
@@ -7,141 +7,141 @@
 - name: "Include install-{{ ansible_os_family }}.yml"
   include: "install-{{ ansible_os_family }}.yml"
 
-- name: Include trombik.x509_certificate if opendistroforelasticsearch_include_role_x509_certificate is true
+- name: Include trombik.x509_certificate if opensearch_include_role_x509_certificate is true
   include_role:
     name: trombik.x509_certificate
-  when: opendistroforelasticsearch_include_role_x509_certificate
+  when: opensearch_include_role_x509_certificate
 
 - name: Create data directory
   file:
-    path: "{{ opendistroforelasticsearch_db_dir }}"
+    path: "{{ opensearch_db_dir }}"
     state: directory
-    owner: "{{ opendistroforelasticsearch_user }}"
-    group: "{{ opendistroforelasticsearch_group }}"
+    owner: "{{ opensearch_user }}"
+    group: "{{ opensearch_group }}"
     mode: 0755
 
-- name: Create opendistroforelasticsearch_log_dir directory
+- name: Create opensearch_log_dir directory
   file:
-    path: "{{ opendistroforelasticsearch_log_dir }}"
+    path: "{{ opensearch_log_dir }}"
     state: directory
-    owner: "{{ opendistroforelasticsearch_user }}"
-    group: "{{ opendistroforelasticsearch_group }}"
+    owner: "{{ opensearch_user }}"
+    group: "{{ opensearch_group }}"
     mode: 0755
 
 - name: Create path.scripts directory if specified
   # XXX this should have been created by package
   file:
-    path: "{{ opendistroforelasticsearch_scripts_dir }}"
+    path: "{{ opensearch_scripts_dir }}"
     state: directory
     mode: 0755
   when:
-    - opendistroforelasticsearch_scripts_dir | length > 0
+    - opensearch_scripts_dir | length > 0
 
-- name: Create opendistroforelasticsearch_conf_dir
+- name: Create opensearch_conf_dir
   file:
-    path: "{{ opendistroforelasticsearch_conf_dir }}"
+    path: "{{ opensearch_conf_dir }}"
     # XXX OpenDistroSecurityPlugin insists it should be 0700
-    # [c.a.o.s.OpenDistroSecurityPlugin] [testnode] Directory /etc/elasticsearch has insecure file permissions (should be 0700)
+    # [c.a.o.s.OpenDistroSecurityPlugin] [testnode] Directory /etc/opensearch has insecure file permissions (should be 0700)
     # XXX opendistro_security 1.3.0.0 does not.
     mode: 0755
-    owner: "{{ opendistroforelasticsearch_user }}"
-    group: "{{ opendistroforelasticsearch_group }}"
+    owner: "{{ opensearch_user }}"
+    group: "{{ opensearch_group }}"
     state: directory
 
 - name: Create jvm.options
   template:
     src: jvm.options.j2
-    dest: "{{ opendistroforelasticsearch_conf_dir }}/jvm.options"
-    owner: "{{ opendistroforelasticsearch_user }}"
-    group: "{{ opendistroforelasticsearch_group }}"
+    dest: "{{ opensearch_conf_dir }}/jvm.options"
+    owner: "{{ opensearch_user }}"
+    group: "{{ opensearch_group }}"
     mode: 0644
   notify:
-    - Restart opendistroforelasticsearch
+    - Restart opensearch
 
 - name: Create log4j2.properties
   template:
     src: log4j2.properties.j2
-    dest: "{{ opendistroforelasticsearch_conf_dir }}/log4j2.properties"
-    owner: "{{ opendistroforelasticsearch_user }}"
-    group: "{{ opendistroforelasticsearch_group }}"
+    dest: "{{ opensearch_conf_dir }}/log4j2.properties"
+    owner: "{{ opensearch_user }}"
+    group: "{{ opensearch_group }}"
     mode: 0644
   notify:
-    - Restart opendistroforelasticsearch
+    - Restart opensearch
 
-- name: Create elasticsearch.yml
+- name: Create opensearch.yml
   template:
-    src: elasticsearch.yml.j2
-    dest: "{{ opendistroforelasticsearch_conf_file }}"
+    src: opensearch.yml.j2
+    dest: "{{ opensearch_conf_file }}"
     mode: 0440
-    owner: "{{ opendistroforelasticsearch_user }}"
-    group: "{{ opendistroforelasticsearch_group }}"
+    owner: "{{ opensearch_user }}"
+    group: "{{ opensearch_group }}"
   notify:
-    - Restart opendistroforelasticsearch
+    - Restart opensearch
 
 - name: Register installed plugins
-  shell: "{{ opendistroforelasticsearch_plugin_command }} list"
+  shell: "{{ opensearch_plugin_command }} list"
   environment:
-    JAVA_HOME: "{{ opendistroforelasticsearch_java_home }}"
+    JAVA_HOME: "{{ opensearch_java_home }}"
   register: shell_output
   changed_when: False
 
 - name: Create plugins directory
   file:
-    path: "{{ opendistroforelasticsearch_plugins_dir }}"
-    # owner: "{{ opendistroforelasticsearch_user }}"
-    # group: "{{ opendistroforelasticsearch_group }}"
+    path: "{{ opensearch_plugins_dir }}"
+    # owner: "{{ opensearch_user }}"
+    # group: "{{ opensearch_group }}"
     mode: 0755
     state: directory
 
 - name: Install plugins
-  command: "{{ opendistroforelasticsearch_plugin_command }} install --batch {% if 'src' in item %}{{ item.src }}{% else %}{{ item.name }}{% endif %}"
+  command: "{{ opensearch_plugin_command }} install --batch {% if 'src' in item %}{{ item.src }}{% else %}{{ item.name }}{% endif %}"
   environment:
-    JAVA_HOME: "{{ opendistroforelasticsearch_java_home }}"
-  with_items: "{{ opendistroforelasticsearch_plugins }}"
+    JAVA_HOME: "{{ opensearch_java_home }}"
+  with_items: "{{ opensearch_plugins }}"
   when:
     - "(not 'state' in item ) or (item['state'] == 'present')"
     - "not (shell_output.stdout is search(item['name']))"
 
-- name: Create basedir of opendistroforelasticsearch_extra_plugin_files
+- name: Create basedir of opensearch_extra_plugin_files
   file:
-    path: "{{ opendistroforelasticsearch_plugins_dir }}/{{ item.path | dirname }}"
+    path: "{{ opensearch_plugins_dir }}/{{ item.path | dirname }}"
     state: directory
     mode: 0755
-  with_items: "{{ opendistroforelasticsearch_extra_plugin_files }}"
+  with_items: "{{ opensearch_extra_plugin_files }}"
   when:
     - "(not 'state' in item) or (item['state'] == 'present')"
 
-- name: Create opendistroforelasticsearch_extra_plugin_files
+- name: Create opensearch_extra_plugin_files
   template:
     src: "{{ item.type }}.j2"
-    dest: "{{ opendistroforelasticsearch_plugins_dir }}/{{ item.path }}"
+    dest: "{{ opensearch_plugins_dir }}/{{ item.path }}"
     mode: "{{ item.mode | default(omit) }}"
     owner: "{{ item.owner | default(omit) }}"
     group: "{{ item.group | default(omit) }}"
-  with_items: "{{ opendistroforelasticsearch_extra_plugin_files }}"
+  with_items: "{{ opensearch_extra_plugin_files }}"
   when:
     - "(not 'state' in item) or (item['state'] == 'present')"
 
-- name: Delete opendistroforelasticsearch_extra_plugin_files
+- name: Delete opensearch_extra_plugin_files
   file:
-    path: "{{ opendistroforelasticsearch_plugins_dir }}/{{ item.path }}"
+    path: "{{ opensearch_plugins_dir }}/{{ item.path }}"
     state: absent
     mode: 0755
-  with_items: "{{ opendistroforelasticsearch_extra_plugin_files }}"
+  with_items: "{{ opensearch_extra_plugin_files }}"
   when:
     - "'state' in item"
     - "item['state'] == 'absent'"
 
-- name: Start opendistroforelasticsearch
+- name: Start opensearch
   service:
-    name: "{{ opendistroforelasticsearch_service }}"
+    name: "{{ opensearch_service }}"
     state: started
     enabled: yes
-  register: register_elasticsearch_start
+  register: register_opensearch_start
 
-- name: Wait for elasticsearch to start in task
+- name: Wait for opensearch to start in task
   wait_for:
     host: localhost
-    port: "{{ opendistroforelasticsearch_http_port }}"
+    port: "{{ opensearch_http_port }}"
   when:
-    - register_elasticsearch_start.changed
+    - register_opensearch_start.changed

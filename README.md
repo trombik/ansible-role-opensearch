@@ -1,18 +1,10 @@
-# `trombik.opendistroforelasticsearch`
+# `trombik.opensearch`
 
-`ansible` role to manage `opendistroforelasticsearch`.
+`ansible` role to manage `opensearch`.
 
 ## for all users
 
 The role assumes the service is listening on `localhost`.
-
-## for FreeBSD users
-
-`textproc/opendistroforelasticsearch` is not currently available in the
-official ports tree. A WIP port is available at
-[trombik/freebsd-ports-opendistroforelasticsearch](https://github.com/trombik/freebsd-ports-opendistroforelasticsearch).
-The package must be available for installation at somewhere, i.e. in YOUR
-package tree.
 
 # Requirements
 
@@ -24,28 +16,28 @@ dependency because TLS is not mandatory.
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `opendistroforelasticsearch_user` | user name of `opendistroforelasticsearch` | `{{ __opendistroforelasticsearch_user }}` |
-| `opendistroforelasticsearch_group` | group name of `opendistroforelasticsearch` | `{{ __opendistroforelasticsearch_group }}` |
-| `opendistroforelasticsearch_log_dir` | path to log directory | `{{ __opendistroforelasticsearch_log_dir }}` |
-| `opendistroforelasticsearch_db_dir` | path to data directory | `{{ __opendistroforelasticsearch_db_dir }}` |
-| `opendistroforelasticsearch_scripts_dir` | path to script directory | `{{ __opendistroforelasticsearch_scripts_dir }}` |
-| `opendistroforelasticsearch_plugins_dir` | path to plug-in directory | `{{ __opendistroforelasticsearch_plugins_dir }}` |
-| `opendistroforelasticsearch_plugin_command` | path to `elasticsearch-plugin` command | `{{ __opendistroforelasticsearch_plugin_command }}` |
-| `opendistroforelasticsearch_plugins` | a list of plugins (see below) | `[]` |
-| `opendistroforelasticsearch_service` | service name of `opendistroforelasticsearch` | `{{ __opendistroforelasticsearch_service }}` |
-| `opendistroforelasticsearch_package` | package name of `opendistroforelasticsearch` | `{{ __opendistroforelasticsearch_package }}` |
-| `opendistroforelasticsearch_conf_dir` | path to configuration directory | `{{ __opendistroforelasticsearch_conf_dir }}` |
-| `opendistroforelasticsearch_jvm_options` | JVM options (see the example playbook) | `""` |
-| `opendistroforelasticsearch_conf_file` | path to `elasticsearch.yml` | `{{ opendistroforelasticsearch_conf_dir }}/elasticsearch.yml` |
-| `opendistroforelasticsearch_flags` | extra flags for startup scripts | `""` |
-| `opendistroforelasticsearch_config` | the content of `elasticsearch.yml` | `""` |
-| `opendistroforelasticsearch_config_log4j2_properties` | the content of `log4j2.properties` | `""` |
-| `opendistroforelasticsearch_http_port` | listen port of `elasticsearch` | `9200` |
-| `opendistroforelasticsearch_java_home` | `JAVA_HOME` environment variable | `{{ __opendistroforelasticsearch_java_home }}` |
-| `opendistroforelasticsearch_extra_plugin_files` | a list of extra files for plug-ins (see below) | `[]` |
-| `opendistroforelasticsearch_include_role_x509_certificate` | if true, include `trombik.x509_certificate` during the play (`trombik.x509_certificate` must be listed in `requirements.yml`) | `yes` |
+| `opensearch_user` | user name of `opensearch` | `{{ __opensearch_user }}` |
+| `opensearch_group` | group name of `opensearch` | `{{ __opensearch_group }}` |
+| `opensearch_log_dir` | path to log directory | `{{ __opensearch_log_dir }}` |
+| `opensearch_db_dir` | path to data directory | `{{ __opensearch_db_dir }}` |
+| `opensearch_scripts_dir` | path to script directory | `{{ __opensearch_scripts_dir }}` |
+| `opensearch_plugins_dir` | path to plug-in directory | `{{ __opensearch_plugins_dir }}` |
+| `opensearch_plugin_command` | path to `opensearch-plugin` command | `{{ __opensearch_plugin_command }}` |
+| `opensearch_plugins` | a list of plugins (see below) | `[]` |
+| `opensearch_service` | service name of `opensearch` | `{{ __opensearch_service }}` |
+| `opensearch_package` | package name of `opensearch` | `{{ __opensearch_package }}` |
+| `opensearch_conf_dir` | path to configuration directory | `{{ __opensearch_conf_dir }}` |
+| `opensearch_jvm_options` | JVM options (see the example playbook) | `""` |
+| `opensearch_conf_file` | path to `opensearch.yml` | `{{ opensearch_conf_dir }}/opensearch.yml` |
+| `opensearch_flags` | extra flags for startup scripts | `""` |
+| `opensearch_config` | the content of `opensearch.yml` | `""` |
+| `opensearch_config_log4j2_properties` | the content of `log4j2.properties` | `""` |
+| `opensearch_http_port` | listen port of `opensearch` | `9200` |
+| `opensearch_java_home` | `JAVA_HOME` environment variable | `{{ __opensearch_java_home }}` |
+| `opensearch_extra_plugin_files` | a list of extra files for plug-ins (see below) | `[]` |
+| `opensearch_include_role_x509_certificate` | if true, include `trombik.x509_certificate` during the play (`trombik.x509_certificate` must be listed in `requirements.yml`) | `yes` |
 
-## `opendistroforelasticsearch_plugins`
+## `opensearch_plugins`
 
 This is a list of plug-ins. An element of the list is a dict.
 
@@ -54,14 +46,14 @@ This is a list of plug-ins. An element of the list is a dict.
 | `name` | name of the plug-in | yes |
 | `src` | the source of the plug-in, usually an URL | no |
 
-## `opendistroforelasticsearch_extra_plugin_files`
+## `opensearch_extra_plugin_files`
 
 This variable is a list of files for plug-ins. An element of the list is a
 dict.
 
 | Key | Description | Mandatory? |
 |-----|-------------|------------|
-| `path` | relative path to the file from `opendistroforelasticsearch_plugins_dir` | yes |
+| `path` | relative path to the file from `opensearch_plugins_dir` | yes |
 | `type` | either `yaml` or  `raw`. when the type is `yaml`, the value of `content` is rendered as YAML. when the type is `raw`, the value of `content` is rendered as-is. when the value of `state` is omitted, or `present`, `type` must be specified. | no |
 | `mode` | file mode of the file | no |
 | `owner` | owner of the file | no |
@@ -73,53 +65,53 @@ dict.
 
 | Variable | Default |
 |----------|---------|
-| `__opendistroforelasticsearch_user` | `elasticsearch` |
-| `__opendistroforelasticsearch_group` | `elasticsearch` |
-| `__opendistroforelasticsearch_log_dir` | `/var/log/elasticsearch` |
-| `__opendistroforelasticsearch_db_dir` | `/var/lib/elasticsearch` |
-| `__opendistroforelasticsearch_package` | `opendistroforelasticsearch` |
-| `__opendistroforelasticsearch_conf_dir` | `/etc/elasticsearch` |
-| `__opendistroforelasticsearch_scripts_dir` | `""` |
-| `__opendistroforelasticsearch_plugins_dir` | `/usr/share/elasticsearch/plugins` |
-| `__opendistroforelasticsearch_plugin_command` | `/usr/share/elasticsearch/bin/elasticsearch-plugin` |
-| `__opendistroforelasticsearch_service` | `elasticsearch` |
-| `__opendistroforelasticsearch_java_home` | `""` |
+| `__opensearch_user` | `opensearch` |
+| `__opensearch_group` | `opensearch` |
+| `__opensearch_log_dir` | `/var/log/opensearch` |
+| `__opensearch_db_dir` | `/var/lib/opensearch` |
+| `__opensearch_package` | `opensearch` |
+| `__opensearch_conf_dir` | `/etc/opensearch` |
+| `__opensearch_scripts_dir` | `""` |
+| `__opensearch_plugins_dir` | `/usr/share/opensearch/plugins` |
+| `__opensearch_plugin_command` | `/usr/share/opensearch/bin/opensearch-plugin` |
+| `__opensearch_service` | `opensearch` |
+| `__opensearch_java_home` | `""` |
 
 ## FreeBSD
 
 | Variable | Default |
 |----------|---------|
-| `__opendistroforelasticsearch_user` | `elasticsearch` |
-| `__opendistroforelasticsearch_group` | `elasticsearch` |
-| `__opendistroforelasticsearch_log_dir` | `/var/log/elasticsearch` |
-| `__opendistroforelasticsearch_db_dir` | `/var/db/elasticsearch` |
-| `__opendistroforelasticsearch_package` | `textproc/opendistroforelasticsearch` |
-| `__opendistroforelasticsearch_conf_dir` | `/usr/local/etc/elasticsearch` |
-| `__opendistroforelasticsearch_scripts_dir` | `""` |
-| `__opendistroforelasticsearch_plugins_dir` | `/usr/local/lib/elasticsearch/plugins` |
-| `__opendistroforelasticsearch_plugin_command` | `/usr/local/lib/elasticsearch/bin/elasticsearch-plugin` |
-| `__opendistroforelasticsearch_service` | `elasticsearch` |
-| `__opendistroforelasticsearch_java_home` | `/usr/local` |
+| `__opensearch_user` | `opensearch` |
+| `__opensearch_group` | `opensearch` |
+| `__opensearch_log_dir` | `/var/log/opensearch` |
+| `__opensearch_db_dir` | `/var/db/opensearch` |
+| `__opensearch_package` | `textproc/opensearch` |
+| `__opensearch_conf_dir` | `/usr/local/etc/opensearch` |
+| `__opensearch_scripts_dir` | `""` |
+| `__opensearch_plugins_dir` | `/usr/local/lib/opensearch/plugins` |
+| `__opensearch_plugin_command` | `/usr/local/lib/opensearch/bin/opensearch-plugin` |
+| `__opensearch_service` | `opensearch` |
+| `__opensearch_java_home` | `/usr/local` |
 
 ## RedHat
 
 | Variable | Default |
 |----------|---------|
-| `__opendistroforelasticsearch_user` | `elasticsearch` |
-| `__opendistroforelasticsearch_group` | `elasticsearch` |
-| `__opendistroforelasticsearch_log_dir` | `/var/log/elasticsearch` |
-| `__opendistroforelasticsearch_db_dir` | `/var/lib/elasticsearch` |
-| `__opendistroforelasticsearch_package` | `opendistroforelasticsearch` |
-| `__opendistroforelasticsearch_conf_dir` | `/etc/elasticsearch` |
-| `__opendistroforelasticsearch_scripts_dir` | `""` |
-| `__opendistroforelasticsearch_plugins_dir` | `/usr/share/elasticsearch/plugins` |
-| `__opendistroforelasticsearch_plugin_command` | `/usr/share/elasticsearch/bin/elasticsearch-plugin` |
-| `__opendistroforelasticsearch_service` | `elasticsearch` |
-| `__opendistroforelasticsearch_java_home` | `""` |
+| `__opensearch_user` | `opensearch` |
+| `__opensearch_group` | `opensearch` |
+| `__opensearch_log_dir` | `/var/log/opensearch` |
+| `__opensearch_db_dir` | `/var/lib/opensearch` |
+| `__opensearch_package` | `opensearch` |
+| `__opensearch_conf_dir` | `/etc/opensearch` |
+| `__opensearch_scripts_dir` | `""` |
+| `__opensearch_plugins_dir` | `/usr/share/opensearch/plugins` |
+| `__opensearch_plugin_command` | `/usr/share/opensearch/bin/opensearch-plugin` |
+| `__opensearch_service` | `opensearch` |
+| `__opensearch_java_home` | `""` |
 
 # Dependencies
 
-- [`trombik.x509_certificate`](https://github.com/trombik/ansible-role-x509_certificate) when `opendistroforelasticsearch_include_role_x509_certificate` is true
+- [`trombik.x509_certificate`](https://github.com/trombik/ansible-role-x509_certificate) when `opensearch_include_role_x509_certificate` is true
 
 # Example Playbook
 
@@ -135,7 +127,7 @@ dict.
       when: ansible_os_family == "RedHat"
     - role: trombik.java
     - role: trombik.sysctl
-    - ansible-role-opendistroforelasticsearch
+    - ansible-role-opensearch
   vars:
     freebsd_pkg_repo:
       local:
@@ -150,30 +142,31 @@ dict.
       - deb [arch=amd64] https://d3g5vo6xdbdb9a.cloudfront.net/apt stable main
       - deb https://artifacts.elastic.co/packages/oss-7.x/apt stable main
     apt_repo_keys_to_add:
-      - https://artifacts.elastic.co/GPG-KEY-elasticsearch
-      - https://d3g5vo6xdbdb9a.cloudfront.net/GPG-KEY-opendistroforelasticsearch
+      - https://artifacts.elastic.co/GPG-KEY-opensearch
+      - https://d3g5vo6xdbdb9a.cloudfront.net/GPG-KEY-opensearch
     redhat_repo:
-      elasticsearch7:
+      opensearch7:
         baseurl: https://artifacts.elastic.co/packages/oss-7.x/yum
-        gpgkey: https://artifacts.elastic.co/GPG-KEY-elasticsearch
+        gpgkey: https://artifacts.elastic.co/GPG-KEY-opensearch
         gpgcheck: yes
         enabled: yes
-      opendistroforelasticsearch:
+      opensearch:
         baseurl: https://d3g5vo6xdbdb9a.cloudfront.net/yum/noarch/
-        gpgkey: https://d3g5vo6xdbdb9a.cloudfront.net/GPG-KEY-opendistroforelasticsearch
+        gpgkey: https://d3g5vo6xdbdb9a.cloudfront.net/GPG-KEY-opensearch
         enabled: yes
         gpgcheck: yes
-    os_opendistroforelasticsearch_extra_packages:
+    os_opensearch_extra_packages:
       FreeBSD: []
       Debian:
-        # XXX install elasticsearch-oss that opendistroforelasticsearch
+        # XXX install opensearch-oss that opensearch
         # requires.
-        - elasticsearch-oss=7.10.2
+        - opensearch-oss=7.10.2
         - unzip
       RedHat: []
-    opendistroforelasticsearch_extra_packages: "{{ os_opendistroforelasticsearch_extra_packages[ansible_os_family] }}"
+    opensearch_extra_packages: "{{ os_opensearch_extra_packages[ansible_os_family] }}"
     os_java_packages:
-      FreeBSD: []
+      FreeBSD:
+        - openjdk11
       Debian:
         - openjdk-11-jdk
       RedHat:
@@ -188,26 +181,25 @@ dict.
     sysctl: "{{ os_sysctl[ansible_os_family] }}"
 
 
-    os_opendistroforelasticsearch_package:
-      FreeBSD: "{{ __opendistroforelasticsearch_package }}"
-      Debian: "{{ __opendistroforelasticsearch_package }}"
-      RedHat: opendistroforelasticsearch-1.13.2
-    opendistroforelasticsearch_package: "{{ os_opendistroforelasticsearch_package[ansible_os_family] }}"
-    os_opendistroforelasticsearch_flags:
-      FreeBSD: |
-        elasticsearch_java_home={{ opendistroforelasticsearch_java_home }}
+    os_opensearch_package:
+      FreeBSD: "{{ __opensearch_package }}"
+      Debian: "{{ __opensearch_package }}"
+      RedHat: opensearch-1.13.2
+    opensearch_package: "{{ os_opensearch_package[ansible_os_family] }}"
+    os_opensearch_flags:
+      FreeBSD: ""
       Debian: |
-        ES_PATH_CONF={{ opendistroforelasticsearch_conf_dir }}
+        ES_PATH_CONF={{ opensearch_conf_dir }}
         ES_STARTUP_SLEEP_TIME=5
         MAX_OPEN_FILES=65535
         MAX_LOCKED_MEMORY=unlimited
       RedHat: |
-        ES_PATH_CONF={{ opendistroforelasticsearch_conf_dir }}
+        ES_PATH_CONF={{ opensearch_conf_dir }}
         ES_STARTUP_SLEEP_TIME=5
         MAX_OPEN_FILES=65535
         MAX_LOCKED_MEMORY=unlimited
-    opendistroforelasticsearch_flags: "{{ os_opendistroforelasticsearch_flags[ansible_os_family] }}"
-    opendistroforelasticsearch_jvm_options: |
+    opensearch_flags: "{{ os_opensearch_flags[ansible_os_family] }}"
+    opensearch_jvm_options: |
       -Xms1024m
       -Xmx1024m
       -Xmx1g
@@ -224,18 +216,17 @@ dict.
       -Dio.netty.recycler.maxCapacityPerThread=0
       -Dlog4j.shutdownHookEnabled=false
       -Dlog4j2.disable.jmx=true
-      -Djava.io.tmpdir=${ES_TMPDIR}
+      -Djava.io.tmpdir=/tmp
       -XX:+HeapDumpOnOutOfMemoryError
       -XX:HeapDumpPath=data
-      -XX:ErrorFile={{ opendistroforelasticsearch_log_dir }}/hs_err_pid%p.log
+      -XX:ErrorFile={{ opensearch_log_dir }}/hs_err_pid%p.log
       -XX:+UseCompressedOops
-    opendistroforelasticsearch_config:
-      opendistro_security.disabled: true
+    opensearch_config:
       discovery.type: single-node
       network.publish_host: ["10.0.2.15"]
-      path.data: "{{ opendistroforelasticsearch_db_dir }}"
-      http.port: "{{ opendistroforelasticsearch_http_port }}"
-      path.logs: "{{ opendistroforelasticsearch_log_dir }}"
+      path.data: "{{ opensearch_db_dir }}"
+      http.port: "{{ opensearch_http_port }}"
+      path.logs: "{{ opensearch_log_dir }}"
       node.data: "true"
       http.compression: "true"
       network.host:
@@ -250,54 +241,56 @@ dict.
       http.cors.allow-headers: "X-Requested-With, Content-Type, Content-Length"
       http.cors.allow-credentials: "true"
       # _________________________TLS
-      opendistro_security.ssl.transport.pemcert_filepath: node.pem
-      opendistro_security.ssl.transport.pemkey_filepath: node-key.pem
-      opendistro_security.ssl.transport.pemtrustedcas_filepath: root-ca.pem
-      opendistro_security.ssl.transport.enforce_hostname_verification: false
-      opendistro_security.ssl.http.enabled: true
-      opendistro_security.ssl.http.pemcert_filepath: node.pem
-      opendistro_security.ssl.http.pemkey_filepath: node-key.pem
-      opendistro_security.ssl.http.pemtrustedcas_filepath: root-ca.pem
-      opendistro_security.allow_default_init_securityindex: true
-      opendistro_security.authcz.admin_dn:
+      # plugins.security.ssl.transport.keystore_filepath or plugins.security.ssl.transport.server.pemcert_filepath and plugins.security.ssl.transport.client.pemcert_filepath must be set if transport ssl is requested.
+      #
+      # plugins.security.ssl.transport.pemkey_filepath	
+      # plugins.security.ssl.transport.pemkey_password
+      # plugins.security.ssl.transport.pemcert_filepath
+      # plugins.security.ssl.transport.pemtrustedcas_filepath
+      #
+      plugins.security.ssl.transport.pemcert_filepath: node.pem
+      plugins.security.ssl.transport.pemkey_filepath: node-key.pem
+      plugins.security.ssl.transport.pemtrustedcas_filepath: root-ca.pem
+      plugins.security.ssl.transport.enforce_hostname_verification: false
+      plugins.security.ssl.http.enabled: true
+      plugins.security.ssl.http.pemcert_filepath: node.pem
+      plugins.security.ssl.http.pemkey_filepath: node-key.pem
+      plugins.security.ssl.http.pemtrustedcas_filepath: root-ca.pem
+      plugins.security.allow_default_init_securityindex: true
+      plugins.security.authcz.admin_dn:
         - CN=localhost,O=Internet Widgits Pty Ltd,ST=Some-State,C=AU
-      opendistro_security.nodes_dn:
+      plugins.security.nodes_dn:
         - CN=localhost,O=Internet Widgits Pty Ltd,ST=Some-State,C=AU
-      opendistro_security.audit.type: internal_elasticsearch
-      opendistro_security.enable_snapshot_restore_privilege: true
-      opendistro_security.check_snapshot_restore_write_privileges: true
-      opendistro_security.restapi.roles_enabled: ["all_access", "security_rest_api_access"]
+      plugins.security.audit.type: internal_opensearch
+      plugins.security.enable_snapshot_restore_privilege: true
+      plugins.security.check_snapshot_restore_write_privileges: true
+      plugins.security.restapi.roles_enabled: ["all_access", "security_rest_api_access"]
       cluster.routing.allocation.disk.threshold_enabled: false
       node.max_local_storage_nodes: 3
-      opendistro_security.audit.config.disabled_rest_categories: NONE
-      opendistro_security.audit.config.disabled_transport_categories: NONE
-    project_opendistro_plugin_base_url: https://d3g5vo6xdbdb9a.cloudfront.net/downloads/elasticsearch-plugins
 
-    # XXX see version matrix at https://opendistro.github.io/for-elasticsearch-docs/docs/install/plugins/
-    opendistroforelasticsearch_plugins:
-      - name: opendistro_security
-        src: "{{ project_opendistro_plugin_base_url }}/opendistro-security/opendistro-security-1.13.1.0.zip"
-    opendistroforelasticsearch_extra_plugin_files:
-      - path: opendistro_security/securityconfig/roles.yml
+    # XXX see version matrix at https://opensearch.github.io/for-opensearch-docs/docs/install/plugins/
+    opensearch_plugins: []
+    opensearch_extra_plugin_files:
+      - path: opensearch-security/securityconfig/roles.yml
         type: yaml
         mode: "0640"
-        group: "{{ opendistroforelasticsearch_user }}"
+        group: "{{ opensearch_user }}"
         content:
           _meta:
             type: roles
             config_version: 2
-      - path: opendistro_security/securityconfig/roles_mapping.yml
+      - path: opensearch-security/securityconfig/roles_mapping.yml
         type: yaml
         mode: "0640"
-        group: "{{ opendistroforelasticsearch_user }}"
+        group: "{{ opensearch_user }}"
         content:
           _meta:
             type: rolesmapping
             config_version: 2
-      - path: opendistro_security/securityconfig/internal_users.yml
+      - path: opensearch-security/securityconfig/internal_users.yml
         type: yaml
         mode: "0640"
-        group: "{{ opendistroforelasticsearch_user }}"
+        group: "{{ opensearch_user }}"
         content:
           _meta:
             type: "internalusers"
@@ -318,17 +311,28 @@ dict.
             backend_roles:
               - admin
             description: "Demo admin user"
-      - path: opendistro_security/securityconfig/config.yml
+      - path: opensearch-security/securityconfig/config.yml
         type: yaml
         mode: "0640"
-        group: "{{ opendistroforelasticsearch_user }}"
+        group: "{{ opensearch_user }}"
         content:
           http_authenticator:
             type: basic
             challenge: true
 
     # taken from config/log4j2.properties
-    opendistroforelasticsearch_config_log4j2_properties: |
+    opensearch_config_log4j2_properties: |
+      #
+      # SPDX-License-Identifier: Apache-2.0
+      #
+      # The OpenSearch Contributors require contributions made to
+      # this file be licensed under the Apache-2.0 license or a
+      # compatible open source license.
+      #
+      # Modifications Copyright OpenSearch Contributors. See
+      # GitHub history for details.
+      #
+
       status = error
 
       appender.console.type = Console
@@ -339,11 +343,11 @@ dict.
       ######## Server JSON ############################
       appender.rolling.type = RollingFile
       appender.rolling.name = rolling
-      appender.rolling.fileName = ${sys:es.logs.base_path}${sys:file.separator}${sys:es.logs.cluster_name}_server.json
-      appender.rolling.layout.type = ESJsonLayout
+      appender.rolling.fileName = ${sys:opensearch.logs.base_path}${sys:file.separator}${sys:opensearch.logs.cluster_name}_server.json
+      appender.rolling.layout.type = OpenSearchJsonLayout
       appender.rolling.layout.type_name = server
 
-      appender.rolling.filePattern = ${sys:es.logs.base_path}${sys:file.separator}${sys:es.logs.cluster_name}-%d{yyyy-MM-dd}-%i.json.gz
+      appender.rolling.filePattern = ${sys:opensearch.logs.base_path}${sys:file.separator}${sys:opensearch.logs.cluster_name}-%d{yyyy-MM-dd}-%i.json.gz
       appender.rolling.policies.type = Policies
       appender.rolling.policies.time.type = TimeBasedTriggeringPolicy
       appender.rolling.policies.time.interval = 1
@@ -353,20 +357,20 @@ dict.
       appender.rolling.strategy.type = DefaultRolloverStrategy
       appender.rolling.strategy.fileIndex = nomax
       appender.rolling.strategy.action.type = Delete
-      appender.rolling.strategy.action.basepath = ${sys:es.logs.base_path}
+      appender.rolling.strategy.action.basepath = ${sys:opensearch.logs.base_path}
       appender.rolling.strategy.action.condition.type = IfFileName
-      appender.rolling.strategy.action.condition.glob = ${sys:es.logs.cluster_name}-*
+      appender.rolling.strategy.action.condition.glob = ${sys:opensearch.logs.cluster_name}-*
       appender.rolling.strategy.action.condition.nested_condition.type = IfAccumulatedFileSize
       appender.rolling.strategy.action.condition.nested_condition.exceeds = 2GB
       ################################################
       ######## Server -  old style pattern ###########
       appender.rolling_old.type = RollingFile
       appender.rolling_old.name = rolling_old
-      appender.rolling_old.fileName = ${sys:es.logs.base_path}${sys:file.separator}${sys:es.logs.cluster_name}.log
+      appender.rolling_old.fileName = ${sys:opensearch.logs.base_path}${sys:file.separator}${sys:opensearch.logs.cluster_name}.log
       appender.rolling_old.layout.type = PatternLayout
       appender.rolling_old.layout.pattern = [%d{ISO8601}][%-5p][%-25c{1.}] [%node_name]%marker %m%n
 
-      appender.rolling_old.filePattern = ${sys:es.logs.base_path}${sys:file.separator}${sys:es.logs.cluster_name}-%d{yyyy-MM-dd}-%i.log.gz
+      appender.rolling_old.filePattern = ${sys:opensearch.logs.base_path}${sys:file.separator}${sys:opensearch.logs.cluster_name}-%d{yyyy-MM-dd}-%i.log.gz
       appender.rolling_old.policies.type = Policies
       appender.rolling_old.policies.time.type = TimeBasedTriggeringPolicy
       appender.rolling_old.policies.time.interval = 1
@@ -376,9 +380,9 @@ dict.
       appender.rolling_old.strategy.type = DefaultRolloverStrategy
       appender.rolling_old.strategy.fileIndex = nomax
       appender.rolling_old.strategy.action.type = Delete
-      appender.rolling_old.strategy.action.basepath = ${sys:es.logs.base_path}
+      appender.rolling_old.strategy.action.basepath = ${sys:opensearch.logs.base_path}
       appender.rolling_old.strategy.action.condition.type = IfFileName
-      appender.rolling_old.strategy.action.condition.glob = ${sys:es.logs.cluster_name}-*
+      appender.rolling_old.strategy.action.condition.glob = ${sys:opensearch.logs.cluster_name}-*
       appender.rolling_old.strategy.action.condition.nested_condition.type = IfAccumulatedFileSize
       appender.rolling_old.strategy.action.condition.nested_condition.exceeds = 2GB
       ################################################
@@ -391,13 +395,13 @@ dict.
       ######## Deprecation JSON #######################
       appender.deprecation_rolling.type = RollingFile
       appender.deprecation_rolling.name = deprecation_rolling
-      appender.deprecation_rolling.fileName = ${sys:es.logs.base_path}${sys:file.separator}${sys:es.logs.cluster_name}_deprecation.json
-      appender.deprecation_rolling.layout.type = ESJsonLayout
+      appender.deprecation_rolling.fileName = ${sys:opensearch.logs.base_path}${sys:file.separator}${sys:opensearch.logs.cluster_name}_deprecation.json
+      appender.deprecation_rolling.layout.type = OpenSearchJsonLayout
       appender.deprecation_rolling.layout.type_name = deprecation
-      appender.deprecation_rolling.layout.esmessagefields=x-opaque-id
+      appender.deprecation_rolling.layout.opensearchmessagefields=x-opaque-id
       appender.deprecation_rolling.filter.rate_limit.type = RateLimitingFilter
 
-      appender.deprecation_rolling.filePattern = ${sys:es.logs.base_path}${sys:file.separator}${sys:es.logs.cluster_name}_deprecation-%i.json.gz
+      appender.deprecation_rolling.filePattern = ${sys:opensearch.logs.base_path}${sys:file.separator}${sys:opensearch.logs.cluster_name}_deprecation-%i.json.gz
       appender.deprecation_rolling.policies.type = Policies
       appender.deprecation_rolling.policies.size.type = SizeBasedTriggeringPolicy
       appender.deprecation_rolling.policies.size.size = 1GB
@@ -410,11 +414,11 @@ dict.
       ######## Deprecation -  old style pattern #######
       appender.deprecation_rolling_old.type = RollingFile
       appender.deprecation_rolling_old.name = deprecation_rolling_old
-      appender.deprecation_rolling_old.fileName = ${sys:es.logs.base_path}${sys:file.separator}${sys:es.logs.cluster_name}_deprecation.log
+      appender.deprecation_rolling_old.fileName = ${sys:opensearch.logs.base_path}${sys:file.separator}${sys:opensearch.logs.cluster_name}_deprecation.log
       appender.deprecation_rolling_old.layout.type = PatternLayout
       appender.deprecation_rolling_old.layout.pattern = [%d{ISO8601}][%-5p][%-25c{1.}] [%node_name]%marker %m%n
 
-      appender.deprecation_rolling_old.filePattern = ${sys:es.logs.base_path}${sys:file.separator}${sys:es.logs.cluster_name}\
+      appender.deprecation_rolling_old.filePattern = ${sys:opensearch.logs.base_path}${sys:file.separator}${sys:opensearch.logs.cluster_name}\
         _deprecation-%i.log.gz
       appender.deprecation_rolling_old.policies.type = Policies
       appender.deprecation_rolling_old.policies.size.type = SizeBasedTriggeringPolicy
@@ -422,7 +426,7 @@ dict.
       appender.deprecation_rolling_old.strategy.type = DefaultRolloverStrategy
       appender.deprecation_rolling_old.strategy.max = 4
       #################################################
-      logger.deprecation.name = org.elasticsearch.deprecation
+      logger.deprecation.name = org.opensearch.deprecation
       logger.deprecation.level = deprecation
       logger.deprecation.appenderRef.deprecation_rolling.ref = deprecation_rolling
       logger.deprecation.appenderRef.deprecation_rolling_old.ref = deprecation_rolling_old
@@ -432,13 +436,13 @@ dict.
       ######## Search slowlog JSON ####################
       appender.index_search_slowlog_rolling.type = RollingFile
       appender.index_search_slowlog_rolling.name = index_search_slowlog_rolling
-      appender.index_search_slowlog_rolling.fileName = ${sys:es.logs.base_path}${sys:file.separator}${sys:es.logs\
+      appender.index_search_slowlog_rolling.fileName = ${sys:opensearch.logs.base_path}${sys:file.separator}${sys:opensearch.logs\
         .cluster_name}_index_search_slowlog.json
-      appender.index_search_slowlog_rolling.layout.type = ESJsonLayout
+      appender.index_search_slowlog_rolling.layout.type = OpenSearchJsonLayout
       appender.index_search_slowlog_rolling.layout.type_name = index_search_slowlog
-      appender.index_search_slowlog_rolling.layout.esmessagefields=message,took,took_millis,total_hits,types,stats,search_type,total_shards,source,id
+      appender.index_search_slowlog_rolling.layout.opensearchmessagefields=message,took,took_millis,total_hits,types,stats,search_type,total_shards,source,id
 
-      appender.index_search_slowlog_rolling.filePattern = ${sys:es.logs.base_path}${sys:file.separator}${sys:es.logs\
+      appender.index_search_slowlog_rolling.filePattern = ${sys:opensearch.logs.base_path}${sys:file.separator}${sys:opensearch.logs\
         .cluster_name}_index_search_slowlog-%i.json.gz
       appender.index_search_slowlog_rolling.policies.type = Policies
       appender.index_search_slowlog_rolling.policies.size.type = SizeBasedTriggeringPolicy
@@ -449,12 +453,12 @@ dict.
       ######## Search slowlog -  old style pattern ####
       appender.index_search_slowlog_rolling_old.type = RollingFile
       appender.index_search_slowlog_rolling_old.name = index_search_slowlog_rolling_old
-      appender.index_search_slowlog_rolling_old.fileName = ${sys:es.logs.base_path}${sys:file.separator}${sys:es.logs.cluster_name}\
+      appender.index_search_slowlog_rolling_old.fileName = ${sys:opensearch.logs.base_path}${sys:file.separator}${sys:opensearch.logs.cluster_name}\
         _index_search_slowlog.log
       appender.index_search_slowlog_rolling_old.layout.type = PatternLayout
       appender.index_search_slowlog_rolling_old.layout.pattern = [%d{ISO8601}][%-5p][%-25c{1.}] [%node_name]%marker %m%n
 
-      appender.index_search_slowlog_rolling_old.filePattern = ${sys:es.logs.base_path}${sys:file.separator}${sys:es.logs.cluster_name}\
+      appender.index_search_slowlog_rolling_old.filePattern = ${sys:opensearch.logs.base_path}${sys:file.separator}${sys:opensearch.logs.cluster_name}\
         _index_search_slowlog-%i.log.gz
       appender.index_search_slowlog_rolling_old.policies.type = Policies
       appender.index_search_slowlog_rolling_old.policies.size.type = SizeBasedTriggeringPolicy
@@ -471,13 +475,13 @@ dict.
       ######## Indexing slowlog JSON ##################
       appender.index_indexing_slowlog_rolling.type = RollingFile
       appender.index_indexing_slowlog_rolling.name = index_indexing_slowlog_rolling
-      appender.index_indexing_slowlog_rolling.fileName = ${sys:es.logs.base_path}${sys:file.separator}${sys:es.logs.cluster_name}\
+      appender.index_indexing_slowlog_rolling.fileName = ${sys:opensearch.logs.base_path}${sys:file.separator}${sys:opensearch.logs.cluster_name}\
         _index_indexing_slowlog.json
-      appender.index_indexing_slowlog_rolling.layout.type = ESJsonLayout
+      appender.index_indexing_slowlog_rolling.layout.type = OpenSearchJsonLayout
       appender.index_indexing_slowlog_rolling.layout.type_name = index_indexing_slowlog
-      appender.index_indexing_slowlog_rolling.layout.esmessagefields=message,took,took_millis,doc_type,id,routing,source
+      appender.index_indexing_slowlog_rolling.layout.opensearchmessagefields=message,took,took_millis,doc_type,id,routing,source
 
-      appender.index_indexing_slowlog_rolling.filePattern = ${sys:es.logs.base_path}${sys:file.separator}${sys:es.logs.cluster_name}\
+      appender.index_indexing_slowlog_rolling.filePattern = ${sys:opensearch.logs.base_path}${sys:file.separator}${sys:opensearch.logs.cluster_name}\
         _index_indexing_slowlog-%i.json.gz
       appender.index_indexing_slowlog_rolling.policies.type = Policies
       appender.index_indexing_slowlog_rolling.policies.size.type = SizeBasedTriggeringPolicy
@@ -488,12 +492,12 @@ dict.
       ######## Indexing slowlog -  old style pattern ##
       appender.index_indexing_slowlog_rolling_old.type = RollingFile
       appender.index_indexing_slowlog_rolling_old.name = index_indexing_slowlog_rolling_old
-      appender.index_indexing_slowlog_rolling_old.fileName = ${sys:es.logs.base_path}${sys:file.separator}${sys:es.logs.cluster_name}\
+      appender.index_indexing_slowlog_rolling_old.fileName = ${sys:opensearch.logs.base_path}${sys:file.separator}${sys:opensearch.logs.cluster_name}\
         _index_indexing_slowlog.log
       appender.index_indexing_slowlog_rolling_old.layout.type = PatternLayout
       appender.index_indexing_slowlog_rolling_old.layout.pattern = [%d{ISO8601}][%-5p][%-25c{1.}] [%node_name]%marker %m%n
 
-      appender.index_indexing_slowlog_rolling_old.filePattern = ${sys:es.logs.base_path}${sys:file.separator}${sys:es.logs.cluster_name}\
+      appender.index_indexing_slowlog_rolling_old.filePattern = ${sys:opensearch.logs.base_path}${sys:file.separator}${sys:opensearch.logs.cluster_name}\
         _index_indexing_slowlog-%i.log.gz
       appender.index_indexing_slowlog_rolling_old.policies.type = Policies
       appender.index_indexing_slowlog_rolling_old.policies.size.type = SizeBasedTriggeringPolicy
@@ -508,9 +512,10 @@ dict.
       logger.index_indexing_slowlog.appenderRef.index_indexing_slowlog_rolling_old.ref = index_indexing_slowlog_rolling_old
       logger.index_indexing_slowlog.additivity = false
 
+
     x509_certificate_debug_log: yes
     # XXX these keys were create by the following steps described at:
-    # https://opendistro.github.io/for-elasticsearch-docs/docs/security-configuration/generate-certificates/
+    # https://opensearch.github.io/for-opensearch-docs/docs/security-configuration/generate-certificates/
     #
     # here is the copy of the steps:
     #
@@ -536,7 +541,7 @@ dict.
       - name: node
         state: present
         public:
-          path: "{{ opendistroforelasticsearch_conf_dir }}/node.pem"
+          path: "{{ opensearch_conf_dir }}/node.pem"
           mode: "0444"
           key: |
             -----BEGIN CERTIFICATE-----
@@ -560,9 +565,9 @@ dict.
             mzd3/gNRFw==
             -----END CERTIFICATE-----
         secret:
-          path: "{{ opendistroforelasticsearch_conf_dir }}/node-key.pem"
-          owner: "{{ opendistroforelasticsearch_user }}"
-          group: "{{ opendistroforelasticsearch_group }}"
+          path: "{{ opensearch_conf_dir }}/node-key.pem"
+          owner: "{{ opensearch_user }}"
+          group: "{{ opensearch_group }}"
           mode: "0600"
           key: |
             -----BEGIN PRIVATE KEY-----
@@ -596,7 +601,7 @@ dict.
       - name: root-ca
         state: present
         public:
-          path: "{{ opendistroforelasticsearch_conf_dir }}/root-ca.pem"
+          path: "{{ opensearch_conf_dir }}/root-ca.pem"
           key: |
             -----BEGIN CERTIFICATE-----
             MIIDMzCCAhsCCQDFJMQePWLjHzANBgkqhkiG9w0BAQsFADBeMQswCQYDVQQGEwJB
@@ -619,9 +624,9 @@ dict.
             mzd3/gNRFw==
             -----END CERTIFICATE-----
         secret:
-          path: "{{ opendistroforelasticsearch_conf_dir }}/root-ca-key.pem"
-          owner: "{{ opendistroforelasticsearch_user }}"
-          group: "{{ opendistroforelasticsearch_group }}"
+          path: "{{ opensearch_conf_dir }}/root-ca-key.pem"
+          owner: "{{ opensearch_user }}"
+          group: "{{ opensearch_group }}"
           key: |
             -----BEGIN RSA PRIVATE KEY-----
             MIIEowIBAAKCAQEA2vu3zNFLi5s3afKZsjj4WYTqOyQeu7ajCSOVFWu3/rGUQCxY
@@ -653,7 +658,7 @@ dict.
       - name: admin
         state: present
         public:
-          path: "{{ opendistroforelasticsearch_conf_dir }}/admin.pem"
+          path: "{{ opensearch_conf_dir }}/admin.pem"
           key: |
             -----BEGIN CERTIFICATE-----
             MIIDMzCCAhsCCQDFJMQePWLjHjANBgkqhkiG9w0BAQsFADBeMQswCQYDVQQGEwJB
@@ -676,9 +681,9 @@ dict.
             qcmtZpbkfg==
             -----END CERTIFICATE-----
         secret:
-          path: "{{ opendistroforelasticsearch_conf_dir }}/admin-key.pem"
-          owner: "{{ opendistroforelasticsearch_user }}"
-          group: "{{ opendistroforelasticsearch_group }}"
+          path: "{{ opensearch_conf_dir }}/admin-key.pem"
+          owner: "{{ opensearch_user }}"
+          group: "{{ opensearch_group }}"
           key: |
             -----BEGIN PRIVATE KEY-----
             MIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQDLARvM5PM2C2+y

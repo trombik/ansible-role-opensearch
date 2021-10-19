@@ -1,20 +1,20 @@
 ---
 
-- name: Install opendistroforelasticsearch_extra_packages
+- name: Install opensearch_extra_packages
   pkgng:
-    name: "{{ opendistroforelasticsearch_extra_packages }}"
+    name: "{{ opensearch_extra_packages }}"
     state: present
 
-- name: Install elasticsearch
+- name: Install opensearch
   pkgng:
-    name: "{{ opendistroforelasticsearch_package }}"
+    name: "{{ opensearch_package }}"
     state: present
 
 - name: Create rc.subr flagment
   template:
     src: FreeBSD.rc.j2
-    dest: /etc/rc.conf.d/opendistroforelasticsearch
+    dest: /etc/rc.conf.d/opensearch
     mode: 0644
     validate: sh -n %s
   notify:
-    - Restart opendistroforelasticsearch
+    - Restart opensearch

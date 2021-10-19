@@ -5,30 +5,30 @@ require "serverspec"
 
 default_user    = "root"
 default_group   = "root"
-es_package_name = "opendistroforelasticsearch"
-es_service_name = "elasticsearch"
-es_config_dir = "/etc/elasticsearch"
-es_user_name = "elasticsearch"
-es_user_group = "elasticsearch"
+es_package_name = "opensearch"
+es_service_name = "opensearch"
+es_config_dir = "/etc/opensearch"
+es_user_name = "opensearch"
+es_user_group = "opensearch"
 java_home = ""
 
 plugins = [
   # XXX depending on versions, some plugins have -, others `_`.
-  "opendistro[-_]security",
-  "opendistro[-_]alerting"
+  "opensearch[-_]security",
+  "opensearch[-_]alerting"
 ]
 es_extra_packages = []
 extra_files = %w[
-  opendistro_security/securityconfig/roles.yml
-  opendistro_security/securityconfig/roles_mapping.yml
-  opendistro_security/securityconfig/internal_users.yml
-  opendistro_security/securityconfig/config.yml
+  opensearch-security/securityconfig/roles.yml
+  opensearch-security/securityconfig/roles_mapping.yml
+  opensearch-security/securityconfig/internal_users.yml
+  opensearch-security/securityconfig/config.yml
 ]
 
-es_plugin_command = "/usr/share/elasticsearch/bin/elasticsearch-plugin"
-es_plugins_directory = "/usr/share/elasticsearch/plugins"
-es_data_directory = "/var/lib/elasticsearch"
-es_log_directory  = "/var/log/elasticsearch"
+es_plugin_command = "/usr/share/opensearch/bin/opensearch-plugin"
+es_plugins_directory = "/usr/share/opensearch/plugins"
+es_data_directory = "/var/lib/opensearch"
+es_log_directory  = "/var/log/opensearch"
 public_certs = [
   "admin.pem",
   "node.pem",
@@ -43,21 +43,21 @@ private_certs = [
 case os[:family]
 when "freebsd"
   default_group = "wheel"
-  es_package_name = "opendistroforelasticsearch"
-  es_config_dir = "/usr/local/etc/elasticsearch"
-  es_plugin_command = "/usr/local/lib/elasticsearch/bin/elasticsearch-plugin"
-  es_plugins_directory = "/usr/local/lib/elasticsearch/plugins"
-  es_data_directory = "/var/db/elasticsearch"
-  java_home = "/usr/local"
+  es_package_name = "opensearch"
+  es_config_dir = "/usr/local/etc/opensearch"
+  es_plugin_command = "/usr/local/lib/opensearch/bin/opensearch-plugin"
+  es_plugins_directory = "/usr/local/lib/opensearch/plugins"
+  es_data_directory = "/var/db/opensearch"
+  java_home = "/usr/local/openjdk11"
 when "openbsd"
   default_group = "wheel"
-  es_user_name = "_elasticsearch"
-  es_user_group = "_elasticsearch"
-  es_plugin_command = "/usr/local/elasticsearch/bin/plugin"
-  es_plugins_directory = "/usr/local/elasticsearch/plugins"
-  es_data_directory = "/var/elasticsearch"
+  es_user_name = "_opensearch"
+  es_user_group = "_opensearch"
+  es_plugin_command = "/usr/local/opensearch/bin/plugin"
+  es_plugins_directory = "/usr/local/opensearch/plugins"
+  es_data_directory = "/var/opensearch"
 when "ubuntu"
-  es_extra_packages = ["elasticsearch-oss"]
+  es_extra_packages = ["opensearch-oss"]
 end
 
 jvm_option = "#{es_config_dir}/jvm.options"
@@ -124,15 +124,15 @@ when "freebsd"
     it { should be_grouped_into default_group }
   end
 
-  describe file("/etc/rc.conf.d/opendistroforelasticsearch") do
+  describe file("/etc/rc.conf.d/opensearch") do
     it { should be_file }
     it { should be_mode 644 }
     it { should be_owned_by default_user }
     it { should be_grouped_into default_group }
-    its(:content) { should match(/^elasticsearch_java_home=/) }
+    its(:content) { should match(/Managed by ansible/) }
   end
 when "ubuntu"
-  describe file("/etc/default/elasticsearch") do
+  describe file("/etc/default/opensearch") do
     it { should be_file }
     it { should be_mode 644 }
     it { should be_owned_by default_user }
@@ -141,7 +141,7 @@ when "ubuntu"
     its(:content) { should match(/MAX_OPEN_FILES=65535/) }
   end
 when "redhat"
-  describe file("/etc/sysconfig/elasticsearch") do
+  describe file("/etc/sysconfig/opensearch") do
     it { should be_file }
     it { should be_mode 644 }
     it { should be_owned_by default_user }
@@ -150,7 +150,7 @@ when "redhat"
     its(:content) { should match(/MAX_OPEN_FILES=65535/) }
   end
 when "openbsd"
-  describe file("/etc/elasticsearch/jvm.in") do
+  describe file("/etc/opensearch/jvm.in") do
     it { should be_file }
     it { should be_mode 644 }
     it { should be_owned_by default_user }
@@ -165,7 +165,7 @@ end
   end
 end
 
-describe file("#{es_config_dir}/elasticsearch.yml") do
+describe file("#{es_config_dir}/opensearch.yml") do
   it { should be_file }
   it { should be_owned_by es_user_name }
   it { should be_grouped_into es_user_group }
