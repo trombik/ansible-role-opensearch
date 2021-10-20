@@ -10,3 +10,5 @@ ignore: |
   .kitchen.local.yml
   .kitchen/
   extra_roles/
+  # securityconfig is not managed by us
+  files/test/securityconfig
