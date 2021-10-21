@@ -30,6 +30,9 @@ platforms:
     driver_config:
       ssh:
         shell: '/bin/sh'
+      network:
+        - ["forwarded_port", {guest: 5601, host: 5601}]
+        - ["forwarded_port", {guest: 80, host: 8000}]
     provisioner:
       extra_vars:
         ansible_python_interpreter: '/usr/local/bin/python3'

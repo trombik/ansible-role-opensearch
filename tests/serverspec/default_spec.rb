@@ -10,6 +10,7 @@ es_service_name = "opensearch"
 es_config_dir = "/etc/opensearch"
 es_user_name = "opensearch"
 es_user_group = "opensearch"
+cluster_name = "testcluster"
 java_home = ""
 
 plugins = [
@@ -29,6 +30,7 @@ es_plugin_command = "/usr/share/opensearch/bin/opensearch-plugin"
 es_plugins_directory = "/usr/share/opensearch/plugins"
 es_data_directory = "/var/lib/opensearch"
 es_log_directory  = "/var/log/opensearch"
+es_log_file = "#{es_log_directory}/#{cluster_name}.log"
 public_certs = [
   "admin.pem",
   "node.pem",
@@ -39,6 +41,8 @@ private_certs = [
   "node-key.pem",
   "root-ca-key.pem"
 ]
+os_admin_user = "admin"
+os_admin_password = "admin"
 
 case os[:family]
 when "freebsd"
@@ -60,6 +64,18 @@ when "ubuntu"
   es_extra_packages = ["opensearch-oss"]
 end
 
+security_config_dir = "#{es_plugins_directory}/opensearch-security/securityconfig"
+security_config_files = %w[
+  action_groups.yml
+  audit.yml
+  config.yml
+  internal_users.yml
+  nodes_dn.yml
+  roles.yml
+  roles_mapping.yml
+  tenants.yml
+  whitelist.yml
+]
 jvm_option = "#{es_config_dir}/jvm.options"
 log4j2_properties = "#{es_config_dir}/log4j2.properties"
 
@@ -159,7 +175,7 @@ when "openbsd"
   end
 end
 
-[9200, 9300].each do |p|
+[9200, 9300, 80, 5601].each do |p|
   describe port(p) do
     it { should be_listening }
   end
@@ -196,6 +212,16 @@ plugins.each do |p|
   end
 end
 
+case os[:family]
+when "freebsd"
+  describe command("env JAVA_HOME=#{java_home} #{es_plugin_command} list") do
+    # XXX does not work with FreeBSD
+    its(:stdout) { should_not match(/opensearch-performance-analyzer/) }
+    its(:stderr) { should eq "" }
+    its(:exit_status) { should eq 0 }
+  end
+end
+
 extra_files.each do |f|
   describe file "#{es_plugins_directory}/#{f}" do
     it { should be_file }
@@ -226,4 +252,23 @@ private_certs.each do |c|
     its(:content) { should match(/-----BEGIN (?:RSA )?PRIVATE KEY-----/) }
     its(:content) { should match(/-----END (?:RSA )?PRIVATE KEY-----/) }
   end
+end
+
+security_config_files.each do |f|
+  describe file "#{security_config_dir}/#{f}" do
+    it { should exist }
+    it { should be_file }
+    its(:content) { should match(/Managed by ansible/) }
+  end
+end
+
+describe file es_log_file do
+  it { should exist }
+  it { should be_file }
+  its(:content) { should match(/Auditing of internal configuration is enabled/) }
+end
+
+describe command "curl -vv --user #{os_admin_user}:#{os_admin_password} --insecure https://localhost:9200" do
+  its(:exit_status) { should eq 0 }
+  its(:stderr) { should match(Regexp.escape("HTTP/1.1 200 OK")) }
 end

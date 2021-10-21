@@ -5,3 +5,5 @@
 - name: trombik.apt_repo
 - name: trombik.redhat_repo
 - name: trombik.x509_certificate
+- name: trombik.opensearch_dashboards
+- name: trombik.haproxy

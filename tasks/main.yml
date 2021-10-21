@@ -119,6 +119,7 @@
     owner: "{{ item.owner | default(omit) }}"
     group: "{{ item.group | default(omit) }}"
   with_items: "{{ opensearch_extra_plugin_files }}"
+  register: __register_opensearch_extra_plugin_files_create
   when:
     - "(not 'state' in item) or (item['state'] == 'present')"
 
@@ -145,3 +146,30 @@
     port: "{{ opensearch_http_port }}"
   when:
     - register_opensearch_start.changed
+
+- name: Run post_command in opensearch_extra_plugin_files
+  # XXX at the moment, only security plugin needs `post_command`. for the
+  # completeness, `post_command` should have been executed when a file is
+  # removed. will consider to do so when such use-cases arise.
+  #
+  # this might have been implemented with a handler. however, handlers run at
+  # the end of play. with this implementation, other roles or tasks after this
+  # role are able to assume the security settings are up-to-date.
+  #
+  # running commands in a loop is inefficient because securityadmin.sh need
+  # to run once to update all files.
+  ansible.builtin.command:
+    cmd: "{{ item['item']['post_command']['cmd'] }}"
+  args:
+    # XXX i do not want to hard-code `chdir` and others here, but ansile complains.
+    # see "When is it unsafe to bulk-set task arguments from a variable?"
+    # https://docs.ansible.com/ansible/devel/reference_appendices/faq.html#when-is-it-unsafe-to-bulk-set-task-arguments-from-a-variable
+    chdir: "{{ item['item']['post_command']['args']['chdir'] | default(omit) }}"
+    creates: "{{ item['item']['post_command']['args']['creates'] | default(omit) }}"
+    removes: "{{ item['item']['post_command']['args']['removes'] | default(omit) }}"
+  environment:
+    JAVA_HOME: "{{ opensearch_java_home }}"
+  with_items: "{{ __register_opensearch_extra_plugin_files_create['results'] }}"
+  when:
+    - item['changed'] == true
+    - "'post_command' in item['item']"
