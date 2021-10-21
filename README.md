@@ -146,7 +146,11 @@ for more details.
     - role: trombik.sysctl
     - ansible-role-opensearch
     - role: trombik.opensearch_dashboards
+    - role: trombik.haproxy
   vars:
+    # XXX use my own package as the package in the official package tree is
+    # broken. note that the package depends on node10, which is EoLed and has
+    # vulnerabilities.
     freebsd_pkg_repo:
       local:
         enabled: "true"
@@ -185,6 +189,10 @@ for more details.
     os_java_packages:
       FreeBSD:
         - openjdk11
+        - jq
+        - vim
+        - tmux
+        - p5-ack
       Debian:
         - openjdk-11-jdk
       RedHat:
@@ -217,28 +225,7 @@ for more details.
         MAX_OPEN_FILES=65535
         MAX_LOCKED_MEMORY=unlimited
     opensearch_flags: "{{ os_opensearch_flags[ansible_os_family] }}"
-    opensearch_jvm_options: |
-      -Xms1024m
-      -Xmx1024m
-      -Xmx1g
-      -Des.networkaddress.cache.ttl=60
-      -Des.networkaddress.cache.negative.ttl=10
-      -XX:+AlwaysPreTouch
-      -Xss1m
-      -Djava.awt.headless=true
-      -Dfile.encoding=UTF-8
-      -Djna.nosys=true
-      -XX:-OmitStackTraceInFastThrow
-      -Dio.netty.noUnsafe=true
-      -Dio.netty.noKeySetOptimization=true
-      -Dio.netty.recycler.maxCapacityPerThread=0
-      -Dlog4j.shutdownHookEnabled=false
-      -Dlog4j2.disable.jmx=true
-      -Djava.io.tmpdir=/tmp
-      -XX:+HeapDumpOnOutOfMemoryError
-      -XX:HeapDumpPath=data
-      -XX:ErrorFile={{ opensearch_log_dir }}/hs_err_pid%p.log
-      -XX:+UseCompressedOops
+    opensearch_jvm_options: "{{ lookup('file', 'test/jvm_options') }}"
     opensearch_config:
       discovery.type: single-node
       network.publish_host: ["10.0.2.15"]
@@ -270,9 +257,13 @@ for more details.
       plugins.security.allow_unsafe_democertificates: true
       plugins.security.allow_default_init_securityindex: true
       plugins.security.authcz.admin_dn:
+        # XXX use different CN for admin_dn and nodes_dn. when admin_dn ==
+        # nodes_dn, it's an error.
         - CN=Admin,O=Internet Widgits Pty Ltd,ST=Some-State,C=AU
       plugins.security.nodes_dn:
         - CN=localhost,O=Internet Widgits Pty Ltd,ST=Some-State,C=AU
+
+      plugins.security.advanced_modules_enabled: false
       plugins.security.audit.type: internal_opensearch
       plugins.security.enable_snapshot_restore_privilege: true
       plugins.security.check_snapshot_restore_write_privileges: true
@@ -280,8 +271,8 @@ for more details.
       plugins.security.system_indices.enabled: true
       plugins.security.system_indices.indices: [".opendistro-alerting-config", ".opendistro-alerting-alert*", ".opendistro-anomaly-results*", ".opendistro-anomaly-detector*", ".opendistro-anomaly-checkpoints", ".opendistro-anomaly-detection-state", ".opendistro-reports-*", ".opendistro-notifications-*", ".opendistro-notebooks", ".opendistro-asynchronous-search-response*"]
 
+      plugins.security.disabled: false
       cluster.routing.allocation.disk.threshold_enabled: false
-      node.max_local_storage_nodes: 3
 
     project_security_plugin_dir: "{{ opensearch_plugins_dir }}/opensearch-security"
     project_securityadmin_bin: "{{ project_security_plugin_dir }}/tools/securityadmin.sh"
@@ -347,202 +338,11 @@ for more details.
         content: "{{ lookup('file', 'test/securityconfig/whitelist.yml') | from_yaml }}"
         post_command: "{{ project_security_plugin_post_command }}"
 
-    # taken from config/log4j2.properties
-    opensearch_config_log4j2_properties: |
-      #
-      # SPDX-License-Identifier: Apache-2.0
-      #
-      # The OpenSearch Contributors require contributions made to
-      # this file be licensed under the Apache-2.0 license or a
-      # compatible open source license.
-      #
-      # Modifications Copyright OpenSearch Contributors. See
-      # GitHub history for details.
-      #
-
-      status = error
-
-      appender.console.type = Console
-      appender.console.name = console
-      appender.console.layout.type = PatternLayout
-      appender.console.layout.pattern = [%d{ISO8601}][%-5p][%-25c{1.}] [%node_name]%marker %m%n
-
-      ######## Server JSON ############################
-      appender.rolling.type = RollingFile
-      appender.rolling.name = rolling
-      appender.rolling.fileName = ${sys:opensearch.logs.base_path}${sys:file.separator}${sys:opensearch.logs.cluster_name}_server.json
-      appender.rolling.layout.type = OpenSearchJsonLayout
-      appender.rolling.layout.type_name = server
-
-      appender.rolling.filePattern = ${sys:opensearch.logs.base_path}${sys:file.separator}${sys:opensearch.logs.cluster_name}-%d{yyyy-MM-dd}-%i.json.gz
-      appender.rolling.policies.type = Policies
-      appender.rolling.policies.time.type = TimeBasedTriggeringPolicy
-      appender.rolling.policies.time.interval = 1
-      appender.rolling.policies.time.modulate = true
-      appender.rolling.policies.size.type = SizeBasedTriggeringPolicy
-      appender.rolling.policies.size.size = 128MB
-      appender.rolling.strategy.type = DefaultRolloverStrategy
-      appender.rolling.strategy.fileIndex = nomax
-      appender.rolling.strategy.action.type = Delete
-      appender.rolling.strategy.action.basepath = ${sys:opensearch.logs.base_path}
-      appender.rolling.strategy.action.condition.type = IfFileName
-      appender.rolling.strategy.action.condition.glob = ${sys:opensearch.logs.cluster_name}-*
-      appender.rolling.strategy.action.condition.nested_condition.type = IfAccumulatedFileSize
-      appender.rolling.strategy.action.condition.nested_condition.exceeds = 2GB
-      ################################################
-      ######## Server -  old style pattern ###########
-      appender.rolling_old.type = RollingFile
-      appender.rolling_old.name = rolling_old
-      appender.rolling_old.fileName = ${sys:opensearch.logs.base_path}${sys:file.separator}${sys:opensearch.logs.cluster_name}.log
-      appender.rolling_old.layout.type = PatternLayout
-      appender.rolling_old.layout.pattern = [%d{ISO8601}][%-5p][%-25c{1.}] [%node_name]%marker %m%n
-
-      appender.rolling_old.filePattern = ${sys:opensearch.logs.base_path}${sys:file.separator}${sys:opensearch.logs.cluster_name}-%d{yyyy-MM-dd}-%i.log.gz
-      appender.rolling_old.policies.type = Policies
-      appender.rolling_old.policies.time.type = TimeBasedTriggeringPolicy
-      appender.rolling_old.policies.time.interval = 1
-      appender.rolling_old.policies.time.modulate = true
-      appender.rolling_old.policies.size.type = SizeBasedTriggeringPolicy
-      appender.rolling_old.policies.size.size = 128MB
-      appender.rolling_old.strategy.type = DefaultRolloverStrategy
-      appender.rolling_old.strategy.fileIndex = nomax
-      appender.rolling_old.strategy.action.type = Delete
-      appender.rolling_old.strategy.action.basepath = ${sys:opensearch.logs.base_path}
-      appender.rolling_old.strategy.action.condition.type = IfFileName
-      appender.rolling_old.strategy.action.condition.glob = ${sys:opensearch.logs.cluster_name}-*
-      appender.rolling_old.strategy.action.condition.nested_condition.type = IfAccumulatedFileSize
-      appender.rolling_old.strategy.action.condition.nested_condition.exceeds = 2GB
-      ################################################
-
-      rootLogger.level = info
-      rootLogger.appenderRef.console.ref = console
-      rootLogger.appenderRef.rolling.ref = rolling
-      rootLogger.appenderRef.rolling_old.ref = rolling_old
-
-      ######## Deprecation JSON #######################
-      appender.deprecation_rolling.type = RollingFile
-      appender.deprecation_rolling.name = deprecation_rolling
-      appender.deprecation_rolling.fileName = ${sys:opensearch.logs.base_path}${sys:file.separator}${sys:opensearch.logs.cluster_name}_deprecation.json
-      appender.deprecation_rolling.layout.type = OpenSearchJsonLayout
-      appender.deprecation_rolling.layout.type_name = deprecation
-      appender.deprecation_rolling.layout.opensearchmessagefields=x-opaque-id
-      appender.deprecation_rolling.filter.rate_limit.type = RateLimitingFilter
-
-      appender.deprecation_rolling.filePattern = ${sys:opensearch.logs.base_path}${sys:file.separator}${sys:opensearch.logs.cluster_name}_deprecation-%i.json.gz
-      appender.deprecation_rolling.policies.type = Policies
-      appender.deprecation_rolling.policies.size.type = SizeBasedTriggeringPolicy
-      appender.deprecation_rolling.policies.size.size = 1GB
-      appender.deprecation_rolling.strategy.type = DefaultRolloverStrategy
-      appender.deprecation_rolling.strategy.max = 4
-
-      appender.header_warning.type = HeaderWarningAppender
-      appender.header_warning.name = header_warning
-      #################################################
-      ######## Deprecation -  old style pattern #######
-      appender.deprecation_rolling_old.type = RollingFile
-      appender.deprecation_rolling_old.name = deprecation_rolling_old
-      appender.deprecation_rolling_old.fileName = ${sys:opensearch.logs.base_path}${sys:file.separator}${sys:opensearch.logs.cluster_name}_deprecation.log
-      appender.deprecation_rolling_old.layout.type = PatternLayout
-      appender.deprecation_rolling_old.layout.pattern = [%d{ISO8601}][%-5p][%-25c{1.}] [%node_name]%marker %m%n
-
-      appender.deprecation_rolling_old.filePattern = ${sys:opensearch.logs.base_path}${sys:file.separator}${sys:opensearch.logs.cluster_name}\
-        _deprecation-%i.log.gz
-      appender.deprecation_rolling_old.policies.type = Policies
-      appender.deprecation_rolling_old.policies.size.type = SizeBasedTriggeringPolicy
-      appender.deprecation_rolling_old.policies.size.size = 1GB
-      appender.deprecation_rolling_old.strategy.type = DefaultRolloverStrategy
-      appender.deprecation_rolling_old.strategy.max = 4
-      #################################################
-      logger.deprecation.name = org.opensearch.deprecation
-      logger.deprecation.level = deprecation
-      logger.deprecation.appenderRef.deprecation_rolling.ref = deprecation_rolling
-      logger.deprecation.appenderRef.deprecation_rolling_old.ref = deprecation_rolling_old
-      logger.deprecation.appenderRef.header_warning.ref = header_warning
-      logger.deprecation.additivity = false
-
-      ######## Search slowlog JSON ####################
-      appender.index_search_slowlog_rolling.type = RollingFile
-      appender.index_search_slowlog_rolling.name = index_search_slowlog_rolling
-      appender.index_search_slowlog_rolling.fileName = ${sys:opensearch.logs.base_path}${sys:file.separator}${sys:opensearch.logs\
-        .cluster_name}_index_search_slowlog.json
-      appender.index_search_slowlog_rolling.layout.type = OpenSearchJsonLayout
-      appender.index_search_slowlog_rolling.layout.type_name = index_search_slowlog
-      appender.index_search_slowlog_rolling.layout.opensearchmessagefields=message,took,took_millis,total_hits,types,stats,search_type,total_shards,source,id
-
-      appender.index_search_slowlog_rolling.filePattern = ${sys:opensearch.logs.base_path}${sys:file.separator}${sys:opensearch.logs\
-        .cluster_name}_index_search_slowlog-%i.json.gz
-      appender.index_search_slowlog_rolling.policies.type = Policies
-      appender.index_search_slowlog_rolling.policies.size.type = SizeBasedTriggeringPolicy
-      appender.index_search_slowlog_rolling.policies.size.size = 1GB
-      appender.index_search_slowlog_rolling.strategy.type = DefaultRolloverStrategy
-      appender.index_search_slowlog_rolling.strategy.max = 4
-      #################################################
-      ######## Search slowlog -  old style pattern ####
-      appender.index_search_slowlog_rolling_old.type = RollingFile
-      appender.index_search_slowlog_rolling_old.name = index_search_slowlog_rolling_old
-      appender.index_search_slowlog_rolling_old.fileName = ${sys:opensearch.logs.base_path}${sys:file.separator}${sys:opensearch.logs.cluster_name}\
-        _index_search_slowlog.log
-      appender.index_search_slowlog_rolling_old.layout.type = PatternLayout
-      appender.index_search_slowlog_rolling_old.layout.pattern = [%d{ISO8601}][%-5p][%-25c{1.}] [%node_name]%marker %m%n
-
-      appender.index_search_slowlog_rolling_old.filePattern = ${sys:opensearch.logs.base_path}${sys:file.separator}${sys:opensearch.logs.cluster_name}\
-        _index_search_slowlog-%i.log.gz
-      appender.index_search_slowlog_rolling_old.policies.type = Policies
-      appender.index_search_slowlog_rolling_old.policies.size.type = SizeBasedTriggeringPolicy
-      appender.index_search_slowlog_rolling_old.policies.size.size = 1GB
-      appender.index_search_slowlog_rolling_old.strategy.type = DefaultRolloverStrategy
-      appender.index_search_slowlog_rolling_old.strategy.max = 4
-      #################################################
-      logger.index_search_slowlog_rolling.name = index.search.slowlog
-      logger.index_search_slowlog_rolling.level = trace
-      logger.index_search_slowlog_rolling.appenderRef.index_search_slowlog_rolling.ref = index_search_slowlog_rolling
-      logger.index_search_slowlog_rolling.appenderRef.index_search_slowlog_rolling_old.ref = index_search_slowlog_rolling_old
-      logger.index_search_slowlog_rolling.additivity = false
-
-      ######## Indexing slowlog JSON ##################
-      appender.index_indexing_slowlog_rolling.type = RollingFile
-      appender.index_indexing_slowlog_rolling.name = index_indexing_slowlog_rolling
-      appender.index_indexing_slowlog_rolling.fileName = ${sys:opensearch.logs.base_path}${sys:file.separator}${sys:opensearch.logs.cluster_name}\
-        _index_indexing_slowlog.json
-      appender.index_indexing_slowlog_rolling.layout.type = OpenSearchJsonLayout
-      appender.index_indexing_slowlog_rolling.layout.type_name = index_indexing_slowlog
-      appender.index_indexing_slowlog_rolling.layout.opensearchmessagefields=message,took,took_millis,doc_type,id,routing,source
-
-      appender.index_indexing_slowlog_rolling.filePattern = ${sys:opensearch.logs.base_path}${sys:file.separator}${sys:opensearch.logs.cluster_name}\
-        _index_indexing_slowlog-%i.json.gz
-      appender.index_indexing_slowlog_rolling.policies.type = Policies
-      appender.index_indexing_slowlog_rolling.policies.size.type = SizeBasedTriggeringPolicy
-      appender.index_indexing_slowlog_rolling.policies.size.size = 1GB
-      appender.index_indexing_slowlog_rolling.strategy.type = DefaultRolloverStrategy
-      appender.index_indexing_slowlog_rolling.strategy.max = 4
-      #################################################
-      ######## Indexing slowlog -  old style pattern ##
-      appender.index_indexing_slowlog_rolling_old.type = RollingFile
-      appender.index_indexing_slowlog_rolling_old.name = index_indexing_slowlog_rolling_old
-      appender.index_indexing_slowlog_rolling_old.fileName = ${sys:opensearch.logs.base_path}${sys:file.separator}${sys:opensearch.logs.cluster_name}\
-        _index_indexing_slowlog.log
-      appender.index_indexing_slowlog_rolling_old.layout.type = PatternLayout
-      appender.index_indexing_slowlog_rolling_old.layout.pattern = [%d{ISO8601}][%-5p][%-25c{1.}] [%node_name]%marker %m%n
-
-      appender.index_indexing_slowlog_rolling_old.filePattern = ${sys:opensearch.logs.base_path}${sys:file.separator}${sys:opensearch.logs.cluster_name}\
-        _index_indexing_slowlog-%i.log.gz
-      appender.index_indexing_slowlog_rolling_old.policies.type = Policies
-      appender.index_indexing_slowlog_rolling_old.policies.size.type = SizeBasedTriggeringPolicy
-      appender.index_indexing_slowlog_rolling_old.policies.size.size = 1GB
-      appender.index_indexing_slowlog_rolling_old.strategy.type = DefaultRolloverStrategy
-      appender.index_indexing_slowlog_rolling_old.strategy.max = 4
-      #################################################
-
-      logger.index_indexing_slowlog.name = index.indexing.slowlog.index
-      logger.index_indexing_slowlog.level = trace
-      logger.index_indexing_slowlog.appenderRef.index_indexing_slowlog_rolling.ref = index_indexing_slowlog_rolling
-      logger.index_indexing_slowlog.appenderRef.index_indexing_slowlog_rolling_old.ref = index_indexing_slowlog_rolling_old
-      logger.index_indexing_slowlog.additivity = false
-
+    opensearch_config_log4j2_properties: "{{ lookup('file', 'test/log4j2_properties') }}"
 
     x509_certificate_debug_log: yes
-    # XXX these keys were create by the following steps described at:
-    # https://opensearch.github.io/for-opensearch-docs/docs/security-configuration/generate-certificates/
+    # XXX these keys were created by the following steps described at:
+    # https://opensearch.org/docs/latest/security-plugin/configuration/generate-certificates/
     #
     # here is the copy of the steps:
     #
@@ -564,6 +364,8 @@ for more details.
     #
     # Cleanup
     # rm admin-key-temp.pem admin.csr node-key-temp.pem node.csr
+    #
+    # see files/test/certs/Makefile to automate these steps.
     x509_certificate:
       - name: node
         state: present
@@ -599,17 +401,98 @@ for more details.
           key: "{{ lookup('file', 'test/certs/admin-key.pem') }}"
 
     opensearch_dashboards_config:
+      server.host: 127.0.0.1
+      server.port: 5601
+      server.name: "OpenSearch Dashboards"
+      logging.dest: /var/log/opensearch_dashboards.log
+      logging.silent: false
+      logging.verbose: true
       opensearch.hosts: ["https://localhost:9200"]
       opensearch.ssl.verificationMode: none
       opensearch.username: "kibanaserver"
       opensearch.password: "kibanaserver"
-      opensearch.requestHeadersWhitelist:
-        - authorization,securitytenant
       opensearch_security.multitenancy.enabled: true
       opensearch_security.multitenancy.tenants.preferred: ["Private", "Global"]
       opensearch_security.readonly_mode.roles: ["kibana_read_only"]
       # Use this setting if you are running kibana without https
       opensearch_security.cookie.secure: false
+    # _____________________________________________haproxy
+    project_backend_host: 127.0.0.1
+    project_backend_port: 5601
+    haproxy_config: |
+      global
+        daemon
+      {% if ansible_os_family == 'FreeBSD' %}
+      # FreeBSD package does not provide default
+        maxconn 4096
+        log /var/run/log local0 notice
+          user {{ haproxy_user }}
+          group {{ haproxy_group }}
+      {% elif ansible_os_family == 'Debian' %}
+        log /dev/log  local0
+        log /dev/log  local1 notice
+        chroot {{ haproxy_chroot_dir }}
+        stats socket /run/haproxy/admin.sock mode 660 level admin expose-fd listeners
+        stats timeout 30s
+        user {{ haproxy_user }}
+        group {{ haproxy_group }}
+
+        # Default SSL material locations
+        ca-base /etc/ssl/certs
+        crt-base /etc/ssl/private
+
+        # See: https://ssl-config.mozilla.org/#server=haproxy&server-version=2.0.3&config=intermediate
+          ssl-default-bind-ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384
+          ssl-default-bind-ciphersuites TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256
+          ssl-default-bind-options ssl-min-ver TLSv1.2 no-tls-tickets
+      {% elif ansible_os_family == 'OpenBSD' %}
+        log 127.0.0.1   local0 debug
+        maxconn 1024
+        chroot {{ haproxy_chroot_dir }}
+        uid 604
+        gid 604
+        pidfile /var/run/haproxy.pid
+      {% endif %}
+
+      defaults
+        log global
+        mode http
+        timeout connect 5s
+        timeout client 10s
+        timeout server 10s
+        option  httplog
+        option  dontlognull
+        retries 3
+        maxconn 2000
+      {% if ansible_os_family == 'Debian' %}
+        errorfile 400 /etc/haproxy/errors/400.http
+        errorfile 403 /etc/haproxy/errors/403.http
+        errorfile 408 /etc/haproxy/errors/408.http
+        errorfile 500 /etc/haproxy/errors/500.http
+        errorfile 502 /etc/haproxy/errors/502.http
+        errorfile 503 /etc/haproxy/errors/503.http
+        errorfile 504 /etc/haproxy/errors/504.http
+      {% elif ansible_os_family == 'OpenBSD' %}
+        option  redispatch
+      {% endif %}
+
+      frontend http-in
+        bind *:80
+        default_backend servers
+
+      backend servers
+        option forwardfor
+        server server1 {{ project_backend_host }}:{{ project_backend_port }} maxconn 32 check
+
+    os_haproxy_flags:
+      FreeBSD: |
+        haproxy_config="{{ haproxy_conf_file }}"
+        #haproxy_flags="-q -f ${haproxy_config} -p ${pidfile}"
+      Debian: |
+        #CONFIG="/etc/haproxy/haproxy.cfg"
+        #EXTRAOPTS="-de -m 16"
+      OpenBSD: ""
+    haproxy_flags: "{{ os_haproxy_flags[ansible_os_family] }}"
 ```
 
 # License
