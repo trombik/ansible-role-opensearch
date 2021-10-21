@@ -2,9 +2,25 @@
 
 `ansible` role to manage `opensearch`.
 
-## for all users
+## For all users
+
+The role is alpha.
 
 The role assumes the service is listening on `localhost`.
+
+## For FreeBSD users
+
+The example, not the role itself, requires my own port of
+`opensearch-dashboards`, which can be found at
+[trombik/freebsd-ports-opensearch](https://github.com/trombik/freebsd-ports-opensearch).
+However, the port depends on `www/node10`, which is EoLed and deprecated.
+
+See [Issue 835](https://github.com/opensearch-project/OpenSearch-Dashboards/issues/835)
+for the upgrade plan.
+
+## For Debian and Red Hat users
+
+The role does not work on the platforms yet.
 
 # Requirements
 
