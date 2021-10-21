@@ -120,7 +120,7 @@ describe file jvm_option do
   it { should be_mode 644 }
   it { should be_owned_by es_user_name }
   it { should be_grouped_into es_user_group }
-  its(:content) { should match(Regexp.escape("-XX:+UseCompressedOops")) }
+  its(:content) { should match(Regexp.escape("Managed by ansible")) }
 end
 
 describe file log4j2_properties do
