@@ -60,6 +60,23 @@ dict.
 | `group` | group of the file | no |
 | `state` | either `present` or `absent`. `present` creates the file. `absent` deletes the file. the default is `present` | no |
 | `content` | the content of the file (see also `type` above) | no |
+| `post_command` | a dict for `ansible.builtin.command` | no |
+
+`post_command` is a dict to run a command after the status of the item is
+changed. The variable is passed to `ansible.builtin.command` (not
+`ansible.builtin.shell`).
+
+It accepts the following keys:
+
+| Key | Description | Mandatory? |
+|-----|-------------|------------|
+| `cmd` | The command to run | yes |
+| `args` | A dict for `args`. Currently `chdir`, `creates`, and `removes` are supported. | no |
+
+`post_command` is primarily designed for `securityadmin.sh`.
+See
+[Apply changes using securityadmin.sh](https://opensearch.org/docs/latest/security-plugin/configuration/security-admin/)
+for more details.
 
 ## Debian
 
@@ -128,6 +145,7 @@ dict.
     - role: trombik.java
     - role: trombik.sysctl
     - ansible-role-opensearch
+    - role: trombik.opensearch_dashboards
   vars:
     freebsd_pkg_repo:
       local:
@@ -241,13 +259,6 @@ dict.
       http.cors.allow-headers: "X-Requested-With, Content-Type, Content-Length"
       http.cors.allow-credentials: "true"
       # _________________________TLS
-      # plugins.security.ssl.transport.keystore_filepath or plugins.security.ssl.transport.server.pemcert_filepath and plugins.security.ssl.transport.client.pemcert_filepath must be set if transport ssl is requested.
-      #
-      # plugins.security.ssl.transport.pemkey_filepath	
-      # plugins.security.ssl.transport.pemkey_password
-      # plugins.security.ssl.transport.pemcert_filepath
-      # plugins.security.ssl.transport.pemtrustedcas_filepath
-      #
       plugins.security.ssl.transport.pemcert_filepath: node.pem
       plugins.security.ssl.transport.pemkey_filepath: node-key.pem
       plugins.security.ssl.transport.pemtrustedcas_filepath: root-ca.pem
@@ -256,69 +267,85 @@ dict.
       plugins.security.ssl.http.pemcert_filepath: node.pem
       plugins.security.ssl.http.pemkey_filepath: node-key.pem
       plugins.security.ssl.http.pemtrustedcas_filepath: root-ca.pem
+      plugins.security.allow_unsafe_democertificates: true
       plugins.security.allow_default_init_securityindex: true
       plugins.security.authcz.admin_dn:
-        - CN=localhost,O=Internet Widgits Pty Ltd,ST=Some-State,C=AU
+        - CN=Admin,O=Internet Widgits Pty Ltd,ST=Some-State,C=AU
       plugins.security.nodes_dn:
         - CN=localhost,O=Internet Widgits Pty Ltd,ST=Some-State,C=AU
       plugins.security.audit.type: internal_opensearch
       plugins.security.enable_snapshot_restore_privilege: true
       plugins.security.check_snapshot_restore_write_privileges: true
       plugins.security.restapi.roles_enabled: ["all_access", "security_rest_api_access"]
+      plugins.security.system_indices.enabled: true
+      plugins.security.system_indices.indices: [".opendistro-alerting-config", ".opendistro-alerting-alert*", ".opendistro-anomaly-results*", ".opendistro-anomaly-detector*", ".opendistro-anomaly-checkpoints", ".opendistro-anomaly-detection-state", ".opendistro-reports-*", ".opendistro-notifications-*", ".opendistro-notebooks", ".opendistro-asynchronous-search-response*"]
+
       cluster.routing.allocation.disk.threshold_enabled: false
       node.max_local_storage_nodes: 3
 
-    # XXX see version matrix at https://opensearch.github.io/for-opensearch-docs/docs/install/plugins/
+    project_security_plugin_dir: "{{ opensearch_plugins_dir }}/opensearch-security"
+    project_securityadmin_bin: "{{ project_security_plugin_dir }}/tools/securityadmin.sh"
+    project_security_plugin_post_command:
+      cmd: "{{ project_securityadmin_bin }} -icl -nhnv -cacert {{ opensearch_conf_dir }}/root-ca.pem -cert {{ opensearch_conf_dir }}/admin.pem -key {{ opensearch_conf_dir }}/admin-key.pem"
+      args:
+        chdir: "{{ project_security_plugin_dir }}/securityconfig"
+
     opensearch_plugins: []
     opensearch_extra_plugin_files:
-      - path: opensearch-security/securityconfig/roles.yml
+      - path: opensearch-security/securityconfig/action_groups.yml
         type: yaml
         mode: "0640"
         group: "{{ opensearch_user }}"
-        content:
-          _meta:
-            type: roles
-            config_version: 2
-      - path: opensearch-security/securityconfig/roles_mapping.yml
+        content: "{{ lookup('file', 'test/securityconfig/action_groups.yml') | from_yaml }}"
+        post_command: "{{ project_security_plugin_post_command }}"
+      - path: opensearch-security/securityconfig/audit.yml
         type: yaml
         mode: "0640"
         group: "{{ opensearch_user }}"
-        content:
-          _meta:
-            type: rolesmapping
-            config_version: 2
-      - path: opensearch-security/securityconfig/internal_users.yml
-        type: yaml
-        mode: "0640"
-        group: "{{ opensearch_user }}"
-        content:
-          _meta:
-            type: "internalusers"
-            config_version: 2
-          new-user:
-            # XXX the hash is created by tools/hash.sh
-            hash: "$2y$12$88IFVl6IfIwCFh5aQYfOmuXVL9j2hz/GusQb35o.4sdTDAEMTOD.K"
-            reserved: false
-            hidden: false
-            backend_roles:
-              - "some-backend-role"
-            attributes:
-              attribute1: "value1"
-            static: false
-          admin:
-            hash: "$2y$12$88IFVl6IfIwCFh5aQYfOmuXVL9j2hz/GusQb35o.4sdTDAEMTOD.K"
-            reserved: true
-            backend_roles:
-              - admin
-            description: "Demo admin user"
+        content: "{{ lookup('file', 'test/securityconfig/audit.yml') | from_yaml }}"
+        post_command: "{{ project_security_plugin_post_command }}"
       - path: opensearch-security/securityconfig/config.yml
         type: yaml
         mode: "0640"
         group: "{{ opensearch_user }}"
-        content:
-          http_authenticator:
-            type: basic
-            challenge: true
+        content: "{{ lookup('file', 'test/securityconfig/config.yml') | from_yaml }}"
+        post_command: "{{ project_security_plugin_post_command }}"
+      - path: opensearch-security/securityconfig/internal_users.yml
+        type: yaml
+        mode: "0640"
+        group: "{{ opensearch_user }}"
+        content: "{{ lookup('file', 'test/securityconfig/internal_users.yml') | from_yaml }}"
+        post_command: "{{ project_security_plugin_post_command }}"
+      - path: opensearch-security/securityconfig/nodes_dn.yml
+        type: yaml
+        mode: "0640"
+        group: "{{ opensearch_user }}"
+        content: "{{ lookup('file', 'test/securityconfig/nodes_dn.yml') | from_yaml }}"
+        post_command: "{{ project_security_plugin_post_command }}"
+      - path: opensearch-security/securityconfig/roles.yml
+        type: yaml
+        mode: "0640"
+        group: "{{ opensearch_user }}"
+        content: "{{ lookup('file', 'test/securityconfig/roles.yml') | from_yaml }}"
+        post_command: "{{ project_security_plugin_post_command }}"
+      - path: opensearch-security/securityconfig/roles_mapping.yml
+        type: yaml
+        mode: "0640"
+        group: "{{ opensearch_user }}"
+        content: "{{ lookup('file', 'test/securityconfig/roles_mapping.yml') | from_yaml }}"
+        post_command: "{{ project_security_plugin_post_command }}"
+      - path: opensearch-security/securityconfig/tenants.yml
+        type: yaml
+        mode: "0640"
+        group: "{{ opensearch_user }}"
+        content: "{{ lookup('file', 'test/securityconfig/tenants.yml') | from_yaml }}"
+        post_command: "{{ project_security_plugin_post_command }}"
+      - path: opensearch-security/securityconfig/whitelist.yml
+        type: yaml
+        mode: "0640"
+        group: "{{ opensearch_user }}"
+        content: "{{ lookup('file', 'test/securityconfig/whitelist.yml') | from_yaml }}"
+        post_command: "{{ project_security_plugin_post_command }}"
 
     # taken from config/log4j2.properties
     opensearch_config_log4j2_properties: |
@@ -530,7 +557,7 @@ dict.
     # openssl x509 -req -in admin.csr -CA root-ca.pem -CAkey root-ca-key.pem -CAcreateserial -sha256 -out admin.pem
     #
     # Node cert
-    # openssl genrsa -out node-key-temp.pem 204
+    # openssl genrsa -out node-key-temp.pem 2048
     # openssl pkcs8 -inform PEM -outform PEM -in node-key-temp.pem -topk8 -nocrypt -v1 PBE-SHA1-3DES -out node-key.pem
     # openssl req -new -key node-key.pem -out node.csr
     # openssl x509 -req -in node.csr -CA root-ca.pem -CAkey root-ca-key.pem -CAcreateserial -sha256 -out node.pem
@@ -543,176 +570,46 @@ dict.
         public:
           path: "{{ opensearch_conf_dir }}/node.pem"
           mode: "0444"
-          key: |
-            -----BEGIN CERTIFICATE-----
-            MIIDMzCCAhsCCQDFJMQePWLjHzANBgkqhkiG9w0BAQsFADBeMQswCQYDVQQGEwJB
-            VTETMBEGA1UECAwKU29tZS1TdGF0ZTEhMB8GA1UECgwYSW50ZXJuZXQgV2lkZ2l0
-            cyBQdHkgTHRkMRcwFQYDVQQDDA5jYS5leG1hcGxlLm9yZzAeFw0xOTEwMTAwMjMx
-            MThaFw0xOTExMDkwMjMxMThaMFkxCzAJBgNVBAYTAkFVMRMwEQYDVQQIDApTb21l
-            LVN0YXRlMSEwHwYDVQQKDBhJbnRlcm5ldCBXaWRnaXRzIFB0eSBMdGQxEjAQBgNV
-            BAMMCWxvY2FsaG9zdDCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAKbc
-            g+Wu9h+zSQDcY59exw2SYcoKCyjjICxU7dyV2UWDuwHMrp0hPKE6Ihd41ftgWVOl
-            fIra3I0gmGteWztlaEP3wx0tnZdopBJgMegiPjmUcz/w3wqtzgSqH3fTKbQhO4qL
-            jDnwJfOxpoUWdR69DXPFLTi5HrD1/GwmT3ra6ySJGVRKKGnl9ZukwnEqQs58e/+T
-            GCwnGOjkItwE5kxEtPSNRqsm+zfJyy6hwoeCGHyqxwiRTwSNjRdL+rQjGzGPj/OU
-            VDDuXV389+EmKYbTfH790VRULNsT22VjFCwW1yAsmJTFKVktjcGjdcH2iGtLN7CO
-            QVLNR9QIl+x2+9XXSxUCAwEAATANBgkqhkiG9w0BAQsFAAOCAQEAnZEGtf28tpzy
-            36hGJJxLHqewb7xRnoXnm5d5f3x1vTlmtU/Y3NZg4eqV8fBJr6Z9IpgAe4Mzmzna
-            4j4jcUHraKrat/UKxiCqqP+P3FggRhUz5c4aC/pCOF3MRzD4Q9hZHV3gLoZMzerv
-            eza1HuWnaRg2hAIBOlb9Oyn7K4LgMdH3Un4L2tH3eyp0KsMQj/JAW0iZFtVuohzu
-            R7jSBWvYE3+siM2mpHUw6sf5uevgPTyEZg3ionLsGg0M6XdpvgT61m/pE3+7xjQ1
-            I9Eg8TdwRq5gAv0Ywl5BuXyIA40x7x87y4qPpqMpBsc8u7ESlffUs2mor0qfQvm7
-            mzd3/gNRFw==
-            -----END CERTIFICATE-----
+          key: "{{ lookup('file', 'test/certs/node.pem') }}"
         secret:
           path: "{{ opensearch_conf_dir }}/node-key.pem"
           owner: "{{ opensearch_user }}"
           group: "{{ opensearch_group }}"
           mode: "0600"
-          key: |
-            -----BEGIN PRIVATE KEY-----
-            MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCm3IPlrvYfs0kA
-            3GOfXscNkmHKCgso4yAsVO3cldlFg7sBzK6dITyhOiIXeNX7YFlTpXyK2tyNIJhr
-            Xls7ZWhD98MdLZ2XaKQSYDHoIj45lHM/8N8Krc4Eqh930ym0ITuKi4w58CXzsaaF
-            FnUevQ1zxS04uR6w9fxsJk962uskiRlUSihp5fWbpMJxKkLOfHv/kxgsJxjo5CLc
-            BOZMRLT0jUarJvs3ycsuocKHghh8qscIkU8EjY0XS/q0Ixsxj4/zlFQw7l1d/Pfh
-            JimG03x+/dFUVCzbE9tlYxQsFtcgLJiUxSlZLY3Bo3XB9ohrSzewjkFSzUfUCJfs
-            dvvV10sVAgMBAAECggEAHG83isxl5MEIj7z+vQnJoeZwA53yiOUrdmKCpjRi8hWg
-            qI3Ys64WRuNBK/7LeCrTDg4FSyRAsUv8rU9G/LgrLGnsNeywDj0muHrsBkLPl8BU
-            Y3EIkSlNEj5rXl/9m1SOcO2W18i0rvJ3Dfblvnc486GGM0RYlo9UlJlysdzcdT0h
-            ORjgSzREH2J6S6PB5T/waxZ6XGopy3qkF2Q+Bs7K+Rx1uIrztsPMfJ5YcdPTNEiD
-            YDNwWCI5FGI1Wq/5YtpkYlkZx/z+CcAX5njoQKyyZdOJVzUwVRxdEtOPALOYnB8x
-            pUmxugKbE8d2pAYbV513dG6r+BXGyA4QptvyGxWXgQKBgQDVqYL1u+DrbSDYCBjd
-            s379CD64+vtBe6Yfq6QDQS9XGAtTyYcAj+9oUzTew63vOlgfSZ/xVKcOq4Re88mn
-            +KIkl1DA7+O/l8os38lrzDgbZO8vLE+VFpS+TbUegkOFRFpldActyLV6JuyfO58D
-            PsDO+xxtw4lneIlCIM9MOiqXbwKBgQDH7O456+XhYy2BMV1fB+BkTnX9M0SjlXwB
-            Tv7WUfEEMLFJsHae7P+4q396gBAx4CD3gBH+zBULeRdW3wkJKc22QS5kSJaU0T59
-            1bL1n7hIeIu36m+Due+o2PLeda+Hx3hk56JQkXhTpDEZAx2WGOZ81lATOKtUTdDs
-            bAISGyGjuwKBgDb2m0zRnwORGCDavGLT2PgIlfIKBnaK82o0QkXgD+iMs+VC82qu
-            nDyvIuunVOg0jxTFYNK5HxyD/NJcTmTabgORtWFclK7lwkmW6/7CEzDg3zK4aGSG
-            4Y6u+Me3ZN00fziYB3y8pAqfVsGDmd1A2GKmcGLAKWmntU+AlzMZx3kbAoGBAIui
-            Sry/qv4hc+3Q2aL+8FV+i1/+B8mtJUAQuWJdNtWzYI/UJPVZGD4V4eJgQW9kWAIl
-            O+xXA7fQqmFtQ3VX8iqCGfHG1Q05m8jtkaGGHYLYVtVscthw7Bdk9zQyxBc0VT08
-            nxxgjcb1XalXiLmFyK2WTbUvFlK6StplkYit1G/zAoGAYdYiIZmixKsrtdH/CKQY
-            kGBqJY9H+3QQB9fckHROtdOalWrJJCUBF+jEa2e6rLbFSpzj2Dpot2QLiENBMZuH
-            6DAksJ9+B3lxbQxdssFaFa5NocS2v6oAyLbEGNIOEkQ54f0v5HfaPVeLElK4Hs18
-            f5MIWEE6V+z+aNg7aXdrLtU=
-            -----END PRIVATE KEY-----
+          key: "{{ lookup('file', 'test/certs/node-key.pem') }}"
       - name: root-ca
         state: present
         public:
           path: "{{ opensearch_conf_dir }}/root-ca.pem"
-          key: |
-            -----BEGIN CERTIFICATE-----
-            MIIDMzCCAhsCCQDFJMQePWLjHzANBgkqhkiG9w0BAQsFADBeMQswCQYDVQQGEwJB
-            VTETMBEGA1UECAwKU29tZS1TdGF0ZTEhMB8GA1UECgwYSW50ZXJuZXQgV2lkZ2l0
-            cyBQdHkgTHRkMRcwFQYDVQQDDA5jYS5leG1hcGxlLm9yZzAeFw0xOTEwMTAwMjMx
-            MThaFw0xOTExMDkwMjMxMThaMFkxCzAJBgNVBAYTAkFVMRMwEQYDVQQIDApTb21l
-            LVN0YXRlMSEwHwYDVQQKDBhJbnRlcm5ldCBXaWRnaXRzIFB0eSBMdGQxEjAQBgNV
-            BAMMCWxvY2FsaG9zdDCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAKbc
-            g+Wu9h+zSQDcY59exw2SYcoKCyjjICxU7dyV2UWDuwHMrp0hPKE6Ihd41ftgWVOl
-            fIra3I0gmGteWztlaEP3wx0tnZdopBJgMegiPjmUcz/w3wqtzgSqH3fTKbQhO4qL
-            jDnwJfOxpoUWdR69DXPFLTi5HrD1/GwmT3ra6ySJGVRKKGnl9ZukwnEqQs58e/+T
-            GCwnGOjkItwE5kxEtPSNRqsm+zfJyy6hwoeCGHyqxwiRTwSNjRdL+rQjGzGPj/OU
-            VDDuXV389+EmKYbTfH790VRULNsT22VjFCwW1yAsmJTFKVktjcGjdcH2iGtLN7CO
-            QVLNR9QIl+x2+9XXSxUCAwEAATANBgkqhkiG9w0BAQsFAAOCAQEAnZEGtf28tpzy
-            36hGJJxLHqewb7xRnoXnm5d5f3x1vTlmtU/Y3NZg4eqV8fBJr6Z9IpgAe4Mzmzna
-            4j4jcUHraKrat/UKxiCqqP+P3FggRhUz5c4aC/pCOF3MRzD4Q9hZHV3gLoZMzerv
-            eza1HuWnaRg2hAIBOlb9Oyn7K4LgMdH3Un4L2tH3eyp0KsMQj/JAW0iZFtVuohzu
-            R7jSBWvYE3+siM2mpHUw6sf5uevgPTyEZg3ionLsGg0M6XdpvgT61m/pE3+7xjQ1
-            I9Eg8TdwRq5gAv0Ywl5BuXyIA40x7x87y4qPpqMpBsc8u7ESlffUs2mor0qfQvm7
-            mzd3/gNRFw==
-            -----END CERTIFICATE-----
+          key: "{{ lookup('file', 'test/certs/root-ca.pem') }}"
         secret:
           path: "{{ opensearch_conf_dir }}/root-ca-key.pem"
           owner: "{{ opensearch_user }}"
           group: "{{ opensearch_group }}"
-          key: |
-            -----BEGIN RSA PRIVATE KEY-----
-            MIIEowIBAAKCAQEA2vu3zNFLi5s3afKZsjj4WYTqOyQeu7ajCSOVFWu3/rGUQCxY
-            whaN8sZWJ4Tb3giSgFt9daxIAjFT0RNZm9HI9+hthlyQ6EmVtmHv8QOIjWTrIT1S
-            9pZuyHsWcnin2FMX/UM1VxJSZQ3lsKhzbqBlGqmRuWbYi4hqsRxAnDuU78frvqDC
-            gzFgjIEnDZMJeooM+ZLUrXuIIPi+auEl/7n8u3C/anLtt+K5UMCvZrCUSwSycPx2
-            qFdPGpDXedlsfkxzW+mk3s38dHOG/5+qxwZiIexTgRYBRmoASZe5ksSVxKjvEWfF
-            Zv1WoOMivEDwXmgbxojXc1hWfKAT6ArgitTyrQIDAQABAoIBAQDQjgtutaYNP7Z2
-            4OYgJsHgAAZUbQIYJMkBWzIRRJXnq5hVxeaCcpieLua+nHoJ7IAaXwgNmha6f+Aj
-            rxoYnKOZ93LYFDCuCebb3Ep4b7UNdJ+6+Hya/IplxVSLkP3JuNmQCwIx+vEd7S5k
-            IQpOwdOIoRZ4TMrPmQyDwTSHlvcxpKJxVZ0XGSAg9jzqhFpmbn28/GUr8iQD2Mo0
-            U9N6ToddHyDpll0eJouoXesIbvxwyFI0vdHki5fl6LmazKzKjGtr8yD8QqP5D403
-            JdzSNqwElQd7QKpvMPaL1dXpdUUiF+9TUXjt8A1MBtVsSmXMwMiqOfuzPjAj7wkc
-            smfTxjABAoGBAPJ8wjWzZV1QDxzYRYMRCuVSuJrLn4jA8jEEf3X5ej3SMyaVaBOJ
-            YtSuoV4C66jtgHRiQTcUIewiZAurmemeR/VRsW2RPC/w2SYZRytKKm8l5YM2iXSK
-            /VgWTdVSbOhzJYfV0Azp47pY2yW3WZop3lnzcXPM/jthI6NnX4KcdI9BAoGBAOcv
-            qIw8DSXYJUStIJ4wf5jfP2jmjeepA0d007XfZCkLE3ltlrxN2llAf/fq+sbhEtTf
-            vpFnEcRqSvw4y8jd0G2IrvFZoSdr1SbtF6UfdixcB9Br2kqElNxzSX2eNHFOxOPw
-            L+snKT+i1pFAXCOlMBedqZNetyWqBnWSvARUKvRtAoGAQoLl4kTqsMWc35SSvHiY
-            PH6MFCl2ANSrmbZaH8nmNb7KOPMSMQmmCiA8MsUqTpOWgFXS/YCQLWzhdDIFbYb0
-            xd06hYsorx2o8kJMuxsEuKf0ZCE5YrYc92RmxPRu2vN6f9+tyVz+Ecb9lULNWPPT
-            AWk83T6FHVRvqgpYsEKp1gECgYBZ6R8T6wbyAO39l5dn7lSxj6GJmqD1x7WOxNDR
-            mt/JVpVsVEKbWWvh6kPal3iQgFhikeH7iqpOSUiAb1ZR+HJnJxFirAkQ2886JFtd
-            zK6Y8fHYDRoIgSej1PJv+GdM6eWJAJCiU8inBx2LwAwVkNjzVk3tEpkH/OgmMbsN
-            s+5AwQKBgDXibuSSsisvdIN9hsSdCm2TBAx2yiVS/Jm64lVjr+PJpswTG0OY9YLO
-            vN7YiVwEifmpgjwYqwbygU47h3OH22fn+A04geI5XPQJytWOgVfzh2oBWoHcFApi
-            zrAM2P/g2Lnw/ttxnFUHpLe+f2uq+PTgidDl58R2tbt8kTO5QpGG
-            -----END RSA PRIVATE KEY-----
+          key: "{{ lookup('file', 'test/certs/root-ca-key.pem') }}"
       - name: admin
         state: present
         public:
           path: "{{ opensearch_conf_dir }}/admin.pem"
-          key: |
-            -----BEGIN CERTIFICATE-----
-            MIIDMzCCAhsCCQDFJMQePWLjHjANBgkqhkiG9w0BAQsFADBeMQswCQYDVQQGEwJB
-            VTETMBEGA1UECAwKU29tZS1TdGF0ZTEhMB8GA1UECgwYSW50ZXJuZXQgV2lkZ2l0
-            cyBQdHkgTHRkMRcwFQYDVQQDDA5jYS5leG1hcGxlLm9yZzAeFw0xOTEwMTAwMjI2
-            MDlaFw0xOTExMDkwMjI2MDlaMFkxCzAJBgNVBAYTAkFVMRMwEQYDVQQIDApTb21l
-            LVN0YXRlMSEwHwYDVQQKDBhJbnRlcm5ldCBXaWRnaXRzIFB0eSBMdGQxEjAQBgNV
-            BAMMCWxvY2FsaG9zdDCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAMsB
-            G8zk8zYLb7KswWprNaAVBnGyNkbBa3eWH3NjsP6TIiSQWii80aSPk4OxI2juLvqX
-            BACS3sqAd0qW1HUuFfYqOMW4zCPyxPiBBY+3qZP3VlmDWhVZeRnH9RuEuvp24+TX
-            uRv8efri2I3BbKlRObaGwYuwz/S7mCZJX+QkLgOwnkZtjkkoMHQ80UF1C98iroUB
-            qASfVOYtNSWZXj3WsR07qI8Juas2ebenMeRMizZIq2M/APJbawZhw1THOUJpL4Jx
-            sPr/cJkL3n5HU3S7KLaeePItxmWC1oYq452CDytGFAQoL1U8J2JpJ4XJrqPhiEec
-            3JvWD53p8ViSjoNVXkECAwEAATANBgkqhkiG9w0BAQsFAAOCAQEAUfCvEv7D9j+7
-            heOYop/OsY6hFHaPIaeYeHnDkZUGcS+9THjYjoZwML0HzsNbunmE9xw6nj6Fp9lh
-            Zz+ds93JU4uthIcR5FJrvGJr3cCgkx0CyTMaVMZ3aUYszuWWv/ztF0KbeX5g0OmY
-            MDhfH0QLh7crp4vymPuxgzECiyTizuOfb41FaIx32ks3fEUNe6DhGPyjeXjB8AEW
-            noZYNT2Iys06qjpIiPa3yKrk38wALRsnY5eJw844YOmTZodlx+rrjCqkwzsPAO52
-            quywFajsDuy+FwnxJSibPCgbRqJfOYmCKsWJrPc9LyvEEy9l+1yxFNp2z1Zy7iUe
-            qcmtZpbkfg==
-            -----END CERTIFICATE-----
+          key: "{{ lookup('file', 'test/certs/admin.pem') }}"
         secret:
           path: "{{ opensearch_conf_dir }}/admin-key.pem"
           owner: "{{ opensearch_user }}"
           group: "{{ opensearch_group }}"
-          key: |
-            -----BEGIN PRIVATE KEY-----
-            MIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQDLARvM5PM2C2+y
-            rMFqazWgFQZxsjZGwWt3lh9zY7D+kyIkkFoovNGkj5ODsSNo7i76lwQAkt7KgHdK
-            ltR1LhX2KjjFuMwj8sT4gQWPt6mT91ZZg1oVWXkZx/UbhLr6duPk17kb/Hn64tiN
-            wWypUTm2hsGLsM/0u5gmSV/kJC4DsJ5GbY5JKDB0PNFBdQvfIq6FAagEn1TmLTUl
-            mV491rEdO6iPCbmrNnm3pzHkTIs2SKtjPwDyW2sGYcNUxzlCaS+CcbD6/3CZC95+
-            R1N0uyi2nnjyLcZlgtaGKuOdgg8rRhQEKC9VPCdiaSeFya6j4YhHnNyb1g+d6fFY
-            ko6DVV5BAgMBAAECggEAJYuh8aZSmSdKVFiBOUZ015Or6nFUeoehca+xR20juiHK
-            Scrs8eXiPDZVySCE9Q5AYBZ4JgcD754M8h2tU7LfWvT6JQ+Fqgxng7KRLcCBO52e
-            OdYCXjp7HFqQKbPFxTch9Rw030k14kH8XVNt3m7oZqrLtyNPgusDO+mMM6zBWesG
-            yhEtrzXFF+mskOLl7xp/0n/WDO7hsz3PZkEx/hGyNpxHikE+or13lRtSogeZEybv
-            4Y1hhKcZwsVQOtsoSG7fcBwk4F0hJlesOO1M9UPCE8kUjs97oJfLQukuWqap+T4r
-            USECJsVwcsjsruqhr+UQmvDp22PqRGRh6kuZbZwh5QKBgQD8GuWOMAC8R19DPgc3
-            ggfQz97uYwBb2cw/xwCCHVjhF/WQfgPg7g7MNsVr256imZuzsjQIQJEX8tmBgdb1
-            p9Ebs8C+L8xeIfsi7GqlPOaHm80q8sF1SpeQZ36+23SthHN1JT6pLMl8D8WscBZo
-            Kt5NlzpcNCtQ8aqqV/FXyPPp3wKBgQDOJANZPTfWOQO68hm7Zj2sihQTvFb1yxBU
-            F89ol8kvajKYw0Mef/IsTEtRS08pE6AVWvjJC9Wi5JSBxdtaGxDje/4fXj1Ili3u
-            I/DKIJVCz9uq4y8vaqO4npw7/nTGCeqfZHh19pzMuwHxPEfSvjqzr/5fyecSYzL/
-            +0EZz1H73wKBgA89qQcRi9nWDsJH67PFXqeXCYkr3weugRSR+Uvkbk0dX7EejSl5
-            +tcJsKG2oz59PtZ8PX0KOjtSaSfVK6OqQ5ADK/HTfe1q7H3OARyANAeauaqRBnUK
-            z2Lhft4W8lTTHw/D8qfTl1KyuWaVWCVwAgR60gJk/QFlusWVj3eZJHXNAoGAHFiv
-            bTIR349vh+GK0E465OMH577aZmpKEIZFqyhULgT4eDFBpYwKjTTglok4lXlxZf5g
-            f6T097VfBolipH1cUSvXwhB/dN/R6RFgJytb2xgiKNmcv3R2lwiYi1duT11Fui1i
-            szX6UdzVY4rahYxLHjJxVFK7R7gEZ1bxmM79gxkCgYBfeU0SNr9oUL8Rw7pf1pe6
-            H5f1zyPDIKWhzU6aaIdGKr5wUIcQT0/Z75O/JBxXeq3bBkH/eZU/giUE33kpVPsv
-            fx/baNmdyVXvHEn9dQd7i/0LUXF1QgJoreYDz9QV4gYzDOtyWiA/XR+snNsTBH7R
-            0YX6LjQg646+IyFoK6qw+w==
-            -----END PRIVATE KEY-----
+          key: "{{ lookup('file', 'test/certs/admin-key.pem') }}"
+
+    opensearch_dashboards_config:
+      opensearch.hosts: ["https://localhost:9200"]
+      opensearch.ssl.verificationMode: none
+      opensearch.username: "kibanaserver"
+      opensearch.password: "kibanaserver"
+      opensearch.requestHeadersWhitelist:
+        - authorization,securitytenant
+      opensearch_security.multitenancy.enabled: true
+      opensearch_security.multitenancy.tenants.preferred: ["Private", "Global"]
+      opensearch_security.readonly_mode.roles: ["kibana_read_only"]
+      # Use this setting if you are running kibana without https
+      opensearch_security.cookie.secure: false
 ```
 
 # License

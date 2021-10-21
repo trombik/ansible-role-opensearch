@@ -10,6 +10,12 @@
     name: "{{ opensearch_package }}"
     state: present
 
+- name: Remove a plugin
+  # XXX remove a plugin that is written for Linux only (using /dev/shm)
+  ansible.builtin.command: "{{ opensearch_plugin_command }} remove opensearch-performance-analyzer"
+  args:
+    removes: "{{ opensearch_plugins_dir }}/opensearch-performance-analyzer"
+
 - name: Create rc.subr flagment
   template:
     src: FreeBSD.rc.j2
