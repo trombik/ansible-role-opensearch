@@ -75,3 +75,5 @@
 
 # JDK 9+ GC logging
 9-:-Xlog:gc*,gc+age=trace,safepoint:file=${OPENSEARCH_TMPDIR}/gc.log:utctime,pid,tags:filecount=32,filesize=64m
+# XXX do not remove an empty line below as os-specific options follow
+

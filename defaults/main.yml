@@ -2,6 +2,7 @@
 opensearch_user: "{{ __opensearch_user }}"
 opensearch_group: "{{ __opensearch_group }}"
 opensearch_log_dir: "{{ __opensearch_log_dir }}"
+opensearch_log_file: "{{ opensearch_log_dir }}/openseach.log"
 opensearch_db_dir: "{{ __opensearch_db_dir }}"
 opensearch_scripts_dir: "{{ __opensearch_scripts_dir }}"
 opensearch_plugins_dir: "{{ __opensearch_plugins_dir }}"
@@ -20,3 +21,25 @@ opensearch_http_port: 9200
 opensearch_java_home: "{{ __opensearch_java_home }}"
 opensearch_extra_plugin_files: []
 opensearch_include_role_x509_certificate: yes
+
+opensearch_root_dir: "{{ __opensearch_root_dir }}"
+opensearch_src_baseurl: "https://artifacts.opensearch.org/releases/bundle/opensearch/{{ opensearch_src_dist_version }}"
+opensearch_src_dir: "/var/dist"
+opensearch_src_dist_name: "opensearch-{{ opensearch_src_dist_version }}"
+opensearch_src_dist_version: 1.1.0
+opensearch_src_file: "{{ opensearch_src_dir }}/{{ opensearch_src_dist_name }}-linux-x64.tar.gz"
+opensearch_src_gitnature_url: "{{ opensearch_src_baseurl }}/opensearch-{{ opensearch_src_dist_version }}-linux-x64.tar.gz.sig"
+opensearch_src_pgp_key_file: "{{ opensearch_src_dir }}/opensearch.pgp"
+opensearch_src_pgp_key_fingerprint_file: "{{ opensearch_src_dir }}/opensearch.pgp.fingerprint"
+# see https://opensearch.org/verify-signatures.html for the fingerprint
+opensearch_src_pgp_key_fingerprint: C5B7 4989 65EF D1C2 924B A9D5 39D3 1987 9310 D3FC
+opensearch_src_pgp_key_url: https://artifacts.opensearch.org/publickeys/opensearch.pgp
+opensearch_src_sig_file: "{{ opensearch_src_dir }}/opensearch-{{ opensearch_src_dist_version }}-linux-x64.tar.gz.sig"
+opensearch_src_sig_url: "{{ opensearch_src_baseurl }}/opensearch-{{ opensearch_src_dist_version }}-linux-x64.tar.gz.sig"
+opensearch_src_tasks_base_dir: "{{ opensearch_src_dir }}"
+opensearch_src_url: "{{ opensearch_src_baseurl }}/opensearch-{{ opensearch_src_dist_version }}-linux-x64.tar.gz"
+opensearch_src_tasks_file:
+  sig_verified: "{{ opensearch_src_tasks_base_dir }}/.sig_verified-{{ opensearch_src_dist_name }}"
+  key_verified: "{{ opensearch_src_tasks_base_dir }}/.key_verified-{{ opensearch_src_dist_name }}"
+  key_imported: "{{ opensearch_src_tasks_base_dir }}/.key_imported-{{ opensearch_src_dist_name }}"
+  src_extracted: "{{ opensearch_src_tasks_base_dir }}/.src_extracted-{{ opensearch_src_dist_name }}"

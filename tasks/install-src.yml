@@ -1,0 +1,150 @@
+---
+# a huge hack until when Amazon or distributions release packages.
+
+- name: Create opensearch_group
+  group:
+    name: "{{ opensearch_group }}"
+
+- name: Create opensearch_user
+  user:
+    name: "{{ opensearch_user }}"
+    group: "{{ opensearch_group }}"
+    home: "{{ opensearch_root_dir }}"
+    create_home: no
+    system: yes
+    comment: OpenSearch user
+
+- name: Create opensearch_src_dir
+  ansible.builtin.file:
+    path: "{{ opensearch_src_dir }}"
+    mode: "0755"
+    state: directory
+
+- name: Download PGP key from opensearch.org
+  ansible.builtin.get_url:
+    url: "{{ opensearch_src_pgp_key_url }}"
+    mode: "0644"
+    dest: "{{ opensearch_src_pgp_key_file }}"
+  register: __register_opensearch_get_url_pgp_key
+
+- name: Delete all files of opensearch_src_tasks_file when PGP key is downloaded
+  ansible.builtin.file:
+    path: "{{ opensearch_src_tasks_file[item] }}"
+    state: absent
+  with_items: "{{ opensearch_src_tasks_file.keys() | list }}"
+  when:
+    - __register_opensearch_get_url_pgp_key['changed']
+
+- name: Create opensearch_src_pgp_key_fingerprint_file
+  # XXX do not use FQCN here for older ansible version on Ubuntu
+  shell:
+    cmd: "gpg --show-keys --with-colons {{ opensearch_src_pgp_key_file | quote }} > {{ opensearch_src_pgp_key_fingerprint_file | quote  }}"
+    creates: "{{ opensearch_src_pgp_key_fingerprint_file }}"
+  environment:
+    HOME: "/root"
+
+- name: Do verify PGP key with known fingerprint
+  # XXX any GPG guru here? there should be a better way to verify fingerprint
+  shell:
+    cmd: "grep 'fpr:.*:.*:.*:.*:.*:.*:.*:.*:{{ opensearch_src_pgp_key_fingerprint | regex_replace('\\s+', '') }}:' {{ opensearch_src_pgp_key_fingerprint_file | quote }} && touch {{ opensearch_src_tasks_file['key_verified'] | quote }}"
+    creates: "{{ opensearch_src_tasks_file['key_verified'] }}"
+
+- name: Do import PGP key
+  shell:
+    # XXX it _seems_ to be impossible to verify a file without importing the
+    # key.
+    cmd: "gpg --import {{ opensearch_src_pgp_key_file | quote }} && touch {{ opensearch_src_tasks_file['key_imported'] | quote }}"
+    creates: "{{ opensearch_src_tasks_file['key_imported'] }}"
+  environment:
+    HOME: "/root"
+
+- name: Fetch opensearch_src_file
+  ansible.builtin.get_url:
+    url: "{{ opensearch_src_url }}"
+    dest: "{{ opensearch_src_file }}"
+    mode: "0644"
+
+- name: Fetch opensearch_src_sig_file
+  ansible.builtin.get_url:
+    url: "{{ opensearch_src_sig_url }}"
+    dest: "{{ opensearch_src_sig_file }}"
+    mode: "0644"
+
+- name: Do verify opensearch_src_file with imported opensearch_src_pgp_key_file
+  shell:
+    cmd: "gpg --verify {{ opensearch_src_sig_file | quote }} {{ opensearch_src_file | quote }} && touch {{ opensearch_src_tasks_file['sig_verified'] | quote }}"
+    creates: "{{ opensearch_src_tasks_file['sig_verified'] }}"
+  environment:
+    HOME: "/root"
+
+- name: Create opensearch_root_dir
+  ansible.builtin.file:
+    path: "{{ opensearch_root_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Do unarchive opensearch_src_file
+  shell:
+    # XXX use `opensearch` as default owner and group.
+    # opensearch is not a good Unix citizen. it expects all directories
+    # and files are owned by opensearch user, including config directories.
+    # it writes anything anywhere. some directories are "0770", others are
+    # "0700" for no reasons. some scripts do not have exec bit. see `jdk`
+    # directory for example. i do not try to fix all permission issues here.
+    cmd: "tar -xf {{ opensearch_src_file | quote }} -C {{ opensearch_root_dir | quote }} --strip-components=1 --same-permissions --owner={{ opensearch_user | quote }} --group={{ opensearch_group | quote }} --keep-newer-files && touch {{ opensearch_src_tasks_file['src_extracted'] | quote }}"
+    creates: "{{ opensearch_src_tasks_file['src_extracted'] }}"
+
+- name: Ensure required binaries and scripts have execute bit
+  ansible.builtin.file:
+    path: "{{ item }}"
+    mode: "+x"
+  with_items:
+    - "{{ opensearch_plugins_dir }}/opensearch-security/tools/securityadmin.sh"
+    - "{{ opensearch_plugins_dir }}/opensearch-security/tools/hash.sh"
+    - "{{ opensearch_plugins_dir }}/opensearch-performance-analyzer/performance-analyzer-rca/bin/performance-analyzer-rca"
+    - "{{ opensearch_plugins_dir }}/opensearch-performance-analyzer/pa_bin/performance-analyzer-agent"
+    - "{{ opensearch_plugins_dir }}/opensearch-knn/knnlib/libKNNIndexV2_0_11.so"
+
+- name: Create opensearch_log_dir
+  ansible.builtin.file:
+    path: "{{ opensearch_log_dir }}"
+    mode: "0755"
+    owner: "{{ opensearch_user }}"
+    group: "{{ opensearch_group }}"
+    state: directory
+
+- name: Create systemd unit file
+  ansible.builtin.template:
+    src: systemd.unit.j2
+    dest: "/lib/systemd/system/{{ opensearch_service }}.service"
+  register: __register_opensearch_systemd_unit_file
+  notify:
+    - Restart opensearch
+
+- name: Create symlink to systemd unit file
+  ansible.builtin.file:
+    dest: "/etc/systemd/system/{{ opensearch_service }}.service"
+    src: "/lib/systemd/system/{{ opensearch_service }}.service"
+    state: link
+
+- name: Reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: yes
+  when:
+    - __register_opensearch_systemd_unit_file['changed']
+
+- name: Enable opensearch_service
+  ansible.builtin.service:
+    name: "{{ opensearch_service }}"
+    enabled: yes
+
+- name: Create default/opensearch
+  ansible.builtin.template:
+    src: Debian.default.j2
+    dest: /etc/default/opensearch
+    owner: root
+    group: root
+    validate: sh -n %s
+    mode: "0644"
+  notify:
+    - Restart opensearch

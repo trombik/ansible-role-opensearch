@@ -2,25 +2,57 @@
 
 `ansible` role to manage `opensearch`.
 
-## For all users
+The role is alpha. Role variables are not correctly described in this
+`README`. Expect bugs.
 
-The role is alpha.
+## For all users
 
 The role assumes the service is listening on `localhost`.
 
 ## For FreeBSD users
 
 The example, not the role itself, requires my own port of
-`opensearch-dashboards`, which can be found at
+`opensearch-dashboards` for FreeBSD, which can be found at
 [trombik/freebsd-ports-opensearch](https://github.com/trombik/freebsd-ports-opensearch).
-However, the port depends on `www/node10`, which is EoLed and deprecated.
+The example uses [`trombik.opensearch_dashboars`](https://github.com/trombik/ansible-role-opensearch_dashboards).
+However, the port and the role depend on `www/node10`, which is EoLed and
+deprecated.
 
 See [Issue 835](https://github.com/opensearch-project/OpenSearch-Dashboards/issues/835)
 for the upgrade plan.
 
-## For Debian and Red Hat users
+## For Debian users
 
-The role does not work on the platforms yet.
+The role installs `opensearch` from the official tar archive. This
+is a huge hack until when Amazon or distributions release packages.
+
+The role does not install JDK package. The bundled JDK is used instead.
+
+The role imports a PGP key into `root`'s keyring from the upstream project to
+verify the tar file.  If you know how to verify signed file without importing
+PGP key, let me know.
+
+Some plugins do not work yet.
+
+Changes from the default includes:
+
+* log file is under `/var/log/opensearch`
+* the application is installed under `opensearch_root_dir`. The default is `/usr/local/opensearch-dashboards`
+* the user to run the application is `opensearch`
+
+The changes will be updated when an official package is available.
+
+The role downloads the official tar archive under `opensearch_src_dir`. The
+default is `/var/dist` The directory is not just a cache directory. In
+addition to the tar file, it has a PGP key, a signature file , and files to
+control `ansible` tasks.
+
+The role installs a `systemd` unit file for `opensearch`. The author is not an
+expert of `systemd` in any way.
+
+## Red Hat users
+
+The role does not work on the platform yet.
 
 # Requirements
 
@@ -154,11 +186,11 @@ for more details.
   roles:
     - role: trombik.freebsd_pkg_repo
       when: ansible_os_family == "FreeBSD"
-    - role: trombik.apt_repo
-      when: ansible_os_family == "Debian"
     - role: trombik.redhat_repo
       when: ansible_os_family == "RedHat"
     - role: trombik.java
+      # XXX the bundled jdk is used on Ubuntu
+      when: ansible_os_family == "FreeBSD"
     - role: trombik.sysctl
     - ansible-role-opensearch
     - role: trombik.opensearch_dashboards
@@ -174,14 +206,6 @@ for more details.
         mirror_type: none
         priority: 100
         state: present
-    apt_repo_enable_apt_transport_https: yes
-    apt_repo_to_add:
-      - ppa:openjdk-r/ppa
-      - deb [arch=amd64] https://d3g5vo6xdbdb9a.cloudfront.net/apt stable main
-      - deb https://artifacts.elastic.co/packages/oss-7.x/apt stable main
-    apt_repo_keys_to_add:
-      - https://artifacts.elastic.co/GPG-KEY-opensearch
-      - https://d3g5vo6xdbdb9a.cloudfront.net/GPG-KEY-opensearch
     redhat_repo:
       opensearch7:
         baseurl: https://artifacts.elastic.co/packages/oss-7.x/yum
@@ -196,9 +220,6 @@ for more details.
     os_opensearch_extra_packages:
       FreeBSD: []
       Debian:
-        # XXX install opensearch-oss that opensearch
-        # requires.
-        - opensearch-oss=7.10.2
         - unzip
       RedHat: []
     opensearch_extra_packages: "{{ os_opensearch_extra_packages[ansible_os_family] }}"
@@ -218,7 +239,9 @@ for more details.
       FreeBSD:
         kern.maxfilesperproc: 65536
         security.bsd.unprivileged_mlock: 1
-      Debian: []
+      Debian:
+        # see https://opensearch.org/docs/latest/opensearch/install/important-settings/
+        vm.max_map_count: 262144
       RedHat: []
     sysctl: "{{ os_sysctl[ansible_os_family] }}"
 
@@ -241,7 +264,13 @@ for more details.
         MAX_OPEN_FILES=65535
         MAX_LOCKED_MEMORY=unlimited
     opensearch_flags: "{{ os_opensearch_flags[ansible_os_family] }}"
-    opensearch_jvm_options: "{{ lookup('file', 'test/jvm_options') }}"
+    os_opensearch_jvm_options:
+      FreeBSD: ""
+      Debian: |
+        # /usr/bin/getconf CLK_TCK`
+        -Dclk.tck=100
+
+    opensearch_jvm_options: "{{ lookup('file', 'test/jvm_options') + os_opensearch_jvm_options[ansible_os_family] }}"
     opensearch_config:
       discovery.type: single-node
       network.publish_host: ["10.0.2.15"]
@@ -416,14 +445,16 @@ for more details.
           group: "{{ opensearch_group }}"
           key: "{{ lookup('file', 'test/certs/admin-key.pem') }}"
 
+    # _____________________________________________opensearch-dashboards
     opensearch_dashboards_config:
-      server.host: 127.0.0.1
-      server.port: 5601
+      server.host: "{{ opensearch_dashboards_bind_address }}"
+      server.port: "{{ opensearch_dashboards_bind_port }}"
       server.name: "OpenSearch Dashboards"
-      logging.dest: /var/log/opensearch_dashboards.log
-      logging.silent: false
+      # XXX fix the path to log in the FreeBSD package
+      logging.dest: "{% if ansible_os_family == 'FreeBSD' %}/var/log/opensearch_dashboards.log{% else %}{{ opensearch_dashboards_log_file }}{% endif %}"
       logging.verbose: true
       opensearch.hosts: ["https://localhost:9200"]
+      path.data: "{{ opensearch_dashboards_data_dir }}"
       opensearch.ssl.verificationMode: none
       opensearch.username: "kibanaserver"
       opensearch.password: "kibanaserver"
