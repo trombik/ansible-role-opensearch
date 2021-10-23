@@ -76,8 +76,10 @@ dependency because TLS is not mandatory.
 | `opensearch_flags` | extra flags for startup scripts | `""` |
 | `opensearch_config` | the content of `opensearch.yml` | `""` |
 | `opensearch_config_log4j2_properties` | the content of `log4j2.properties` | `""` |
-| `opensearch_http_host` | address of `opensearch`. this address must be accessible from `ansible` controller (the host on which `ansible` runs) | `127.0.0.1` |
+| `opensearch_http_host` | address or `hostname` of `opensearch`. this address must be accessible from `ansible` controller (the host on which `ansible` runs). the value is used for API access, therefore, the value must match `common name` of the certificate when TLS is used and remote host verification is enabled. otherwise, API calls in the role will fail. | `localhost` |
 | `opensearch_http_port` | listen port of `opensearch`. this port must be accessible from `ansible` controller (the host on which `ansible` runs) | `9200` |
+| `opensearch_http_url` | URL of HTTP interface. this URL must be accessible from `ansible` controller (the host on which `ansible` runs) | `https://{{ opensearch_http_host }}:{{ opensearch_http_port }}` |
+| `opensearch_http_auth` | authentication details for API access, see below | `{}` |
 | `opensearch_java_home` | `JAVA_HOME` environment variable | `{{ __opensearch_java_home }}` |
 | `opensearch_extra_plugin_files` | a list of extra files for plug-ins (see below) | `[]` |
 | `opensearch_include_role_x509_certificate` | if true, include `trombik.x509_certificate` during the play (`trombik.x509_certificate` must be listed in `requirements.yml`) | `yes` |
@@ -122,6 +124,76 @@ It accepts the following keys:
 See
 [Apply changes using securityadmin.sh](https://opensearch.org/docs/latest/security-plugin/configuration/security-admin/)
 for more details.
+
+## `opensearch_http_auth`
+
+This variable is a dict, and used as user credential when accessing
+API endpoints at `opensearch_http_url`.
+
+| Key | Description | Mandatory? |
+|-----|-------------|------------|
+| `client_cert` | Path to client public key in `PEM` format. When it is a relative path, the path is relative from working directory on `ansible` controller, NOT on the target machine. | no |
+| `client_key`  | Path to client secret key in `PEM` format. When it is a relative path, the path is relative from working directory on `ansible` controller, NOT on the target machine. | no |
+| `ca_path`     | Path to CA's public key in `PEM` format. When it is a relative path, the path is relative from working directory on `ansible` controller, NOT on the target machine. | no |
+| `url_username` | User name for basic authentication | no |
+| `url_password` | Password for basic authentication | no |
+| `validate_certs` | verify remote certificate | no |
+
+The role passes the variable to
+[`uri`](https://docs.ansible.com/ansible/latest/collections/ansible/builtin/uri_module.html)
+module.
+
+`ca_path` was added in `ansible` version 2.11. `client_cert` and `client_key`
+were added in `ansible` version 2.4. Make sure your `ansible` version supports
+the keys. As a result, you cannot use `validate_certs: yes` when your
+`ansible` version is older than 2.11 and the certificate is not signed by
+a CA in the default CA bundle (in most cases, you want to have your own CA to
+sign certificates because of financial costs).
+
+Note that API calls are made from `ansible` controller. `opensearch_http_url`
+must be accessible from `ansible` controller.
+
+Files that `client_cert`, `client_key`, and `ca_path` point to must be on
+`ansible` controller.
+
+## Known issues with `opensearch_http_auth` and TLS
+
+`opensearch` supports Basic authentication and TLS client certificate
+authentication over TLS. However, in some configurations, API call fails.
+
+The short answer is: use Basic authentication over TLS with `ca_path`. This is
+the only configuration that securely works as expected.
+
+To use TLS client authentication without user name and password, you have to
+set `validate_certs` to `no`. Here is the test matrix and the results.
+
+| Authentication method  | value of `validate_certs` | with `ca_path`? | Result  |
+|------------------------|---------------------------|-----------------|---------|
+| TLS client certificate | `no`                      | Yes             | Success |
+| TLS client certificate | `no`                      | No              | Success |
+| TLS client certificate | `yes`                     | Yes             | *Fail*  |
+| TLS client certificate | `yes`                     | No              | Fail (this is expected as the client cannot validate without CA certificate) |
+| Basic                  | `no`                      | Yes             | Success |
+| Basic                  | `no`                      | No              | Success |
+| Basic                  | `yes`                     | Yes             | Success |
+| Basic                  | `yes`                     | No              | Fail (this is expected as the client cannot validate without CA certificate) |
+
+This could be a bug in `ansible` `uri` module because `curl` works fine in
+both TLS client certification and Basic authentication over TLS. For the
+record, the following commands were used.
+
+```console
+curl -vv --cacert /usr/local/etc/opensearch/root-ca.pem \
+    --cert /usr/local/etc/opensearch/admin.pem \
+    --key /usr/local/etc/opensearch/admin-key.pem \
+    https://localhost:9200
+```
+
+```console
+curl -vv --user admin:admin \
+    --cacert /usr/local/etc/opensearch/root-ca.pem \
+    https://localhost:9200
+```
 
 ## Debian
 
@@ -267,6 +339,19 @@ for more details.
         # /usr/bin/getconf CLK_TCK`
         -Dclk.tck=100
 
+    os_opensearch_http_auth:
+      FreeBSD:
+        url_username: admin
+        url_password: admin
+        ca_path: "{{ role_path }}/files/test/certs/root-ca.pem"
+        validate_certs: yes
+      Debian:
+        client_cert: "{{ role_path }}/files/test/certs/admin.pem"
+        client_key: "{{ role_path }}/files/test/certs/admin-key.pem"
+        # XXX the version of ansible on Ubuntu is 2.9.6. as such, ca_path
+        # cannot be used.
+        validate_certs: no
+    opensearch_http_auth: "{{ os_opensearch_http_auth[ansible_os_family] }}"
     opensearch_jvm_options: "{{ lookup('file', 'test/jvm_options') + os_opensearch_jvm_options[ansible_os_family] }}"
     opensearch_config:
       discovery.type: single-node
@@ -277,7 +362,7 @@ for more details.
       node.data: "true"
       http.compression: "true"
       network.host:
-        - _local_
+        - "{{ opensearch_http_host }}"
         - _site_
       cluster.name: testcluster
       node.name: testnode

@@ -288,7 +288,16 @@ describe file es_log_file do
   its(:content) { should match(/Auditing of internal configuration is enabled/) }
 end
 
-describe command "curl -vv --user #{os_admin_user}:#{os_admin_password} --insecure https://localhost:9200" do
+# password based auth
+# XXX do not use 127.0.0.1 here because hostname must match hostname in the
+# certificate.
+describe command "curl -vv --user #{os_admin_user}:#{os_admin_password} --cacert '#{es_config_dir}/root-ca.pem' https://localhost:9200" do
+  its(:exit_status) { should eq 0 }
+  its(:stderr) { should match(Regexp.escape("HTTP/1.1 200 OK")) }
+end
+
+# client cert auth
+describe command "curl -vv --cacert #{es_config_dir}/root-ca.pem --cert #{es_config_dir}/admin.pem --key #{es_config_dir}/admin-key.pem https://localhost:9200" do
   its(:exit_status) { should eq 0 }
   its(:stderr) { should match(Regexp.escape("HTTP/1.1 200 OK")) }
 end

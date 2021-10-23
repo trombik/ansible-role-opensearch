@@ -87,6 +87,19 @@
         # /usr/bin/getconf CLK_TCK`
         -Dclk.tck=100
 
+    os_opensearch_http_auth:
+      FreeBSD:
+        url_username: admin
+        url_password: admin
+        ca_path: "{{ role_path }}/files/test/certs/root-ca.pem"
+        validate_certs: yes
+      Debian:
+        client_cert: "{{ role_path }}/files/test/certs/admin.pem"
+        client_key: "{{ role_path }}/files/test/certs/admin-key.pem"
+        # XXX the version of ansible on Ubuntu is 2.9.6. as such, ca_path
+        # cannot be used.
+        validate_certs: no
+    opensearch_http_auth: "{{ os_opensearch_http_auth[ansible_os_family] }}"
     opensearch_jvm_options: "{{ lookup('file', 'test/jvm_options') + os_opensearch_jvm_options[ansible_os_family] }}"
     opensearch_config:
       discovery.type: single-node

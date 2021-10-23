@@ -17,11 +17,13 @@ opensearch_conf_file: "{{ opensearch_conf_dir }}/opensearch.yml"
 opensearch_flags: ""
 opensearch_config: ""
 opensearch_config_log4j2_properties: ""
-opensearch_http_host: 127.0.0.1
+opensearch_http_host: localhost
 opensearch_http_port: 9200
+opensearch_http_url: https://{{ opensearch_http_host }}:{{ opensearch_http_port }}
 opensearch_java_home: "{{ __opensearch_java_home }}"
 opensearch_extra_plugin_files: []
 opensearch_include_role_x509_certificate: yes
+opensearch_http_auth: {}
 
 opensearch_root_dir: "{{ __opensearch_root_dir }}"
 opensearch_src_baseurl: "https://artifacts.opensearch.org/releases/bundle/opensearch/{{ opensearch_src_dist_version }}"
