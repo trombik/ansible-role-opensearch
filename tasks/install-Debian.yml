@@ -1,20 +1,14 @@
 ---
 
 - name: Install opensearch_extra_packages
-  apt:
+  ansible.builtin.apt:
     name: "{{ opensearch_extra_packages }}"
     state: present
 
-- name: Install opensearch_package
-  apt:
-    name: "{{ opensearch_package }}"
+- name: Install gpg
+  ansible.builtin.apt:
+    name: gpg
     state: present
 
-- name: Create default/opensearch
-  template:
-    src: Debian.default.j2
-    dest: /etc/default/opensearch
-    owner: root
-    group: root
-    validate: sh -n %s
-    mode: 0644
+- name: "Include install-src.yml"
+  include: "install-src.yml"

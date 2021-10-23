@@ -158,7 +158,9 @@
   #
   # running commands in a loop is inefficient because securityadmin.sh need
   # to run once to update all files.
-  ansible.builtin.command:
+  #
+  # XXX do not use FQCN here for older ansible version on Ubuntu
+  command:
     cmd: "{{ item['item']['post_command']['cmd'] }}"
   args:
     # XXX i do not want to hard-code `chdir` and others here, but ansile complains.

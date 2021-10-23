@@ -3,11 +3,11 @@
   roles:
     - role: trombik.freebsd_pkg_repo
       when: ansible_os_family == "FreeBSD"
-    - role: trombik.apt_repo
-      when: ansible_os_family == "Debian"
     - role: trombik.redhat_repo
       when: ansible_os_family == "RedHat"
     - role: trombik.java
+      # XXX the bundled jdk is used on Ubuntu
+      when: ansible_os_family == "FreeBSD"
     - role: trombik.sysctl
     - ansible-role-opensearch
     - role: trombik.opensearch_dashboards
@@ -23,14 +23,6 @@
         mirror_type: none
         priority: 100
         state: present
-    apt_repo_enable_apt_transport_https: yes
-    apt_repo_to_add:
-      - ppa:openjdk-r/ppa
-      - deb [arch=amd64] https://d3g5vo6xdbdb9a.cloudfront.net/apt stable main
-      - deb https://artifacts.elastic.co/packages/oss-7.x/apt stable main
-    apt_repo_keys_to_add:
-      - https://artifacts.elastic.co/GPG-KEY-opensearch
-      - https://d3g5vo6xdbdb9a.cloudfront.net/GPG-KEY-opensearch
     redhat_repo:
       opensearch7:
         baseurl: https://artifacts.elastic.co/packages/oss-7.x/yum
@@ -45,9 +37,6 @@
     os_opensearch_extra_packages:
       FreeBSD: []
       Debian:
-        # XXX install opensearch-oss that opensearch
-        # requires.
-        - opensearch-oss=7.10.2
         - unzip
       RedHat: []
     opensearch_extra_packages: "{{ os_opensearch_extra_packages[ansible_os_family] }}"
@@ -67,7 +56,9 @@
       FreeBSD:
         kern.maxfilesperproc: 65536
         security.bsd.unprivileged_mlock: 1
-      Debian: []
+      Debian:
+        # see https://opensearch.org/docs/latest/opensearch/install/important-settings/
+        vm.max_map_count: 262144
       RedHat: []
     sysctl: "{{ os_sysctl[ansible_os_family] }}"
 
@@ -90,7 +81,13 @@
         MAX_OPEN_FILES=65535
         MAX_LOCKED_MEMORY=unlimited
     opensearch_flags: "{{ os_opensearch_flags[ansible_os_family] }}"
-    opensearch_jvm_options: "{{ lookup('file', 'test/jvm_options') }}"
+    os_opensearch_jvm_options:
+      FreeBSD: ""
+      Debian: |
+        # /usr/bin/getconf CLK_TCK`
+        -Dclk.tck=100
+
+    opensearch_jvm_options: "{{ lookup('file', 'test/jvm_options') + os_opensearch_jvm_options[ansible_os_family] }}"
     opensearch_config:
       discovery.type: single-node
       network.publish_host: ["10.0.2.15"]
@@ -265,14 +262,16 @@
           group: "{{ opensearch_group }}"
           key: "{{ lookup('file', 'test/certs/admin-key.pem') }}"
 
+    # _____________________________________________opensearch-dashboards
     opensearch_dashboards_config:
-      server.host: 127.0.0.1
-      server.port: 5601
+      server.host: "{{ opensearch_dashboards_bind_address }}"
+      server.port: "{{ opensearch_dashboards_bind_port }}"
       server.name: "OpenSearch Dashboards"
-      logging.dest: /var/log/opensearch_dashboards.log
-      logging.silent: false
+      # XXX fix the path to log in the FreeBSD package
+      logging.dest: "{% if ansible_os_family == 'FreeBSD' %}/var/log/opensearch_dashboards.log{% else %}{{ opensearch_dashboards_log_file }}{% endif %}"
       logging.verbose: true
       opensearch.hosts: ["https://localhost:9200"]
+      path.data: "{{ opensearch_dashboards_data_dir }}"
       opensearch.ssl.verificationMode: none
       opensearch.username: "kibanaserver"
       opensearch.password: "kibanaserver"

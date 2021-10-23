@@ -7,11 +7,16 @@ default_user    = "root"
 default_group   = "root"
 es_package_name = "opensearch"
 es_service_name = "opensearch"
-es_config_dir = "/etc/opensearch"
+es_config_dir = "/usr/local/opensearch/config"
 es_user_name = "opensearch"
 es_user_group = "opensearch"
 cluster_name = "testcluster"
-java_home = ""
+java_home = case os[:family]
+            when "freebsd"
+              "/usr/local/openjdk11"
+            else
+              "/usr/local/opensearch/jdk"
+            end
 
 plugins = [
   # XXX depending on versions, some plugins have -, others `_`.
@@ -26,8 +31,14 @@ extra_files = %w[
   opensearch-security/securityconfig/config.yml
 ]
 
-es_plugin_command = "/usr/share/opensearch/bin/opensearch-plugin"
-es_plugins_directory = "/usr/share/opensearch/plugins"
+es_root_dir = case os[:family]
+              when "freebsd"
+                "/usr/local/lib/opensearch"
+              else
+                "/usr/local/opensearch"
+              end
+es_plugin_command = "#{es_root_dir}/bin/opensearch-plugin"
+es_plugins_directory = "#{es_root_dir}/plugins"
 es_data_directory = "/var/lib/opensearch"
 es_log_directory  = "/var/log/opensearch"
 es_log_file = "#{es_log_directory}/#{cluster_name}.log"
@@ -49,19 +60,14 @@ when "freebsd"
   default_group = "wheel"
   es_package_name = "opensearch"
   es_config_dir = "/usr/local/etc/opensearch"
-  es_plugin_command = "/usr/local/lib/opensearch/bin/opensearch-plugin"
-  es_plugins_directory = "/usr/local/lib/opensearch/plugins"
   es_data_directory = "/var/db/opensearch"
-  java_home = "/usr/local/openjdk11"
 when "openbsd"
   default_group = "wheel"
   es_user_name = "_opensearch"
   es_user_group = "_opensearch"
-  es_plugin_command = "/usr/local/opensearch/bin/plugin"
-  es_plugins_directory = "/usr/local/opensearch/plugins"
   es_data_directory = "/var/opensearch"
 when "ubuntu"
-  es_extra_packages = ["opensearch-oss"]
+  es_extra_packages = ["unzip"]
 end
 
 security_config_dir = "#{es_plugins_directory}/opensearch-security/securityconfig"
@@ -111,8 +117,11 @@ es_extra_packages.each do |p|
   end
 end
 
-describe package(es_package_name) do
-  it { should be_installed }
+case os[:family]
+when "freebsd"
+  describe package(es_package_name) do
+    it { should be_installed }
+  end
 end
 
 describe file jvm_option do
@@ -199,8 +208,14 @@ end
 
 describe file(es_plugins_directory) do
   it { should be_directory }
-  it { should be_owned_by default_user }
-  it { should be_grouped_into default_group }
+  case os[:family]
+  when "freebsd"
+    it { should be_owned_by default_user }
+    it { should be_grouped_into default_group }
+  else
+    it { should be_owned_by es_user_name }
+    it { should be_grouped_into  es_user_group }
+  end
   it { should be_mode 755 }
 end
 
@@ -225,9 +240,14 @@ end
 extra_files.each do |f|
   describe file "#{es_plugins_directory}/#{f}" do
     it { should be_file }
-    it { should be_owned_by default_user }
-    it { should be_grouped_into es_user_group }
+    case os[:family]
+    when "freebsd"
+      it { should be_owned_by default_user }
+    else
+      it { should be_owned_by es_user_name }
+    end
     it { should be_mode 640 }
+    it { should be_grouped_into es_user_group }
     its(:content) { should match(/Managed by ansible/) }
   end
 end

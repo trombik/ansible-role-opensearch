@@ -1,0 +1,18 @@
+# Managed by ansible
+[Unit]
+Description=opensearch daemon
+
+[Service]
+ExecStart={{ opensearch_root_dir }}/bin/opensearch
+ExecStop=/bin/kill -s QUIT $MAINPID
+Type=simple
+User={{ opensearch_user }}
+Group={{ opensearch_group }}
+Environment=OPENSEARCH_PATH_CONF={{ opensearch_conf_dir }}
+{% if ansible_os_family == 'Debian' %}
+EnvironmentFile=/etc/default/{{ opensearch_service }}
+{% elif ansible_os_family == 'RedHat' %}
+EnvironmentFile=/etc/sysconfig/{{ opensearch_service }}
+{% endif %}
+[Install]
+WantedBy=multi-user.target

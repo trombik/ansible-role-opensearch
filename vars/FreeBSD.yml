@@ -5,6 +5,7 @@ __opensearch_log_dir: /var/log/opensearch
 __opensearch_db_dir: /var/db/opensearch
 __opensearch_package: textproc/opensearch
 __opensearch_conf_dir: /usr/local/etc/opensearch
+__opensearch_root_dir: /usr/local/lib/opensearch
 __opensearch_scripts_dir: ""
 __opensearch_plugins_dir: "/usr/local/lib/opensearch/plugins"
 __opensearch_plugin_command: /usr/local/lib/opensearch/bin/opensearch-plugin
