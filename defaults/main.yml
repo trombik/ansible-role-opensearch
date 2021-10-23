@@ -17,6 +17,7 @@ opensearch_conf_file: "{{ opensearch_conf_dir }}/opensearch.yml"
 opensearch_flags: ""
 opensearch_config: ""
 opensearch_config_log4j2_properties: ""
+opensearch_http_host: 127.0.0.1
 opensearch_http_port: 9200
 opensearch_java_home: "{{ __opensearch_java_home }}"
 opensearch_extra_plugin_files: []
