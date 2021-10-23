@@ -142,7 +142,7 @@
 
 - name: Wait for opensearch to start in task
   wait_for:
-    host: localhost
+    host: "{{ opensearch_http_host }}"
     port: "{{ opensearch_http_port }}"
   when:
     - register_opensearch_start.changed

@@ -5,10 +5,6 @@
 The role is alpha. Role variables are not correctly described in this
 `README`. Expect bugs.
 
-## For all users
-
-The role assumes the service is listening on `localhost`.
-
 ## For FreeBSD users
 
 The example, not the role itself, requires my own port of
@@ -80,7 +76,8 @@ dependency because TLS is not mandatory.
 | `opensearch_flags` | extra flags for startup scripts | `""` |
 | `opensearch_config` | the content of `opensearch.yml` | `""` |
 | `opensearch_config_log4j2_properties` | the content of `log4j2.properties` | `""` |
-| `opensearch_http_port` | listen port of `opensearch` | `9200` |
+| `opensearch_http_host` | address of `opensearch`. this address must be accessible from `ansible` controller (the host on which `ansible` runs) | `127.0.0.1` |
+| `opensearch_http_port` | listen port of `opensearch`. this port must be accessible from `ansible` controller (the host on which `ansible` runs) | `9200` |
 | `opensearch_java_home` | `JAVA_HOME` environment variable | `{{ __opensearch_java_home }}` |
 | `opensearch_extra_plugin_files` | a list of extra files for plug-ins (see below) | `[]` |
 | `opensearch_include_role_x509_certificate` | if true, include `trombik.x509_certificate` during the play (`trombik.x509_certificate` must be listed in `requirements.yml`) | `yes` |

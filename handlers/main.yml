@@ -8,5 +8,5 @@
 
 - name: Wait for opensearch to start in handler
   wait_for:
-    host: localhost
+    host: "{{ opensearch_http_host }}"
     port: "{{ opensearch_http_port }}"

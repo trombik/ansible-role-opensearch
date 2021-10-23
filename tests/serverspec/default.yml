@@ -97,7 +97,7 @@
       node.data: "true"
       http.compression: "true"
       network.host:
-        - _local_
+        - "{{ opensearch_http_host }}"
         - _site_
       cluster.name: testcluster
       node.name: testnode
