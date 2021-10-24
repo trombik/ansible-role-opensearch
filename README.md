@@ -247,6 +247,12 @@ curl -vv --user admin:admin \
 
 # Example Playbook
 
+An example to install:
+
+* `opensearch`
+* `opensearch-dashboards`
+* `haproxy`
+
 ```yaml
 ---
 - hosts: localhost
