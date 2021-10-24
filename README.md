@@ -17,7 +17,7 @@ deprecated.
 See [Issue 835](https://github.com/opensearch-project/OpenSearch-Dashboards/issues/835)
 for the upgrade plan.
 
-## For Debian users
+## For Debian-variants and CentOS  users
 
 The role installs `opensearch` from the official tar archive. This
 is a huge hack until when Amazon or distributions release packages.
@@ -45,10 +45,6 @@ control `ansible` tasks.
 
 The role installs a `systemd` unit file for `opensearch`. The author is not an
 expert of `systemd` in any way.
-
-## Red Hat users
-
-The role does not work on the platform yet.
 
 # Requirements
 
@@ -204,12 +200,13 @@ curl -vv --user admin:admin \
 | `__opensearch_log_dir` | `/var/log/opensearch` |
 | `__opensearch_db_dir` | `/var/lib/opensearch` |
 | `__opensearch_package` | `opensearch` |
-| `__opensearch_conf_dir` | `/etc/opensearch` |
+| `__opensearch_conf_dir` | `/usr/local/opensearch/config` |
+| `__opensearch_root_dir` | `/usr/local/opensearch` |
 | `__opensearch_scripts_dir` | `""` |
-| `__opensearch_plugins_dir` | `/usr/share/opensearch/plugins` |
-| `__opensearch_plugin_command` | `/usr/share/opensearch/bin/opensearch-plugin` |
+| `__opensearch_plugins_dir` | `/usr/local/opensearch/plugins` |
+| `__opensearch_plugin_command` | `/usr/local/opensearch/bin/opensearch-plugin` |
 | `__opensearch_service` | `opensearch` |
-| `__opensearch_java_home` | `""` |
+| `__opensearch_java_home` | `/usr/local/opensearch/jdk` |
 
 ## FreeBSD
 
@@ -236,12 +233,13 @@ curl -vv --user admin:admin \
 | `__opensearch_log_dir` | `/var/log/opensearch` |
 | `__opensearch_db_dir` | `/var/lib/opensearch` |
 | `__opensearch_package` | `opensearch` |
-| `__opensearch_conf_dir` | `/etc/opensearch` |
+| `__opensearch_conf_dir` | `/usr/local/opensearch/config` |
+| `__opensearch_root_dir` | `/usr/local/opensearch` |
 | `__opensearch_scripts_dir` | `""` |
-| `__opensearch_plugins_dir` | `/usr/share/opensearch/plugins` |
-| `__opensearch_plugin_command` | `/usr/share/opensearch/bin/opensearch-plugin` |
+| `__opensearch_plugins_dir` | `/usr/local/opensearch/plugins` |
+| `__opensearch_plugin_command` | `/usr/local/opensearch/bin/opensearch-plugin` |
 | `__opensearch_service` | `opensearch` |
-| `__opensearch_java_home` | `""` |
+| `__opensearch_java_home` | `/usr/local/opensearch/jdk` |
 
 # Dependencies
 
@@ -252,13 +250,19 @@ curl -vv --user admin:admin \
 ```yaml
 ---
 - hosts: localhost
+  pre_tasks:
+    - name: Allow HTTP port
+      ansible.builtin.iptables:
+        chain: INPUT
+        destination_port: 80
+        protocol: tcp
+        jump: ACCEPT
+      when: ansible_os_family == 'RedHat'
   roles:
     - role: trombik.freebsd_pkg_repo
       when: ansible_os_family == "FreeBSD"
-    - role: trombik.redhat_repo
-      when: ansible_os_family == "RedHat"
     - role: trombik.java
-      # XXX the bundled jdk is used on Ubuntu
+      # XXX the bundled jdk is used on Ubuntu and CentOS
       when: ansible_os_family == "FreeBSD"
     - role: trombik.sysctl
     - ansible-role-opensearch
@@ -275,17 +279,6 @@ curl -vv --user admin:admin \
         mirror_type: none
         priority: 100
         state: present
-    redhat_repo:
-      opensearch7:
-        baseurl: https://artifacts.elastic.co/packages/oss-7.x/yum
-        gpgkey: https://artifacts.elastic.co/GPG-KEY-opensearch
-        gpgcheck: yes
-        enabled: yes
-      opensearch:
-        baseurl: https://d3g5vo6xdbdb9a.cloudfront.net/yum/noarch/
-        gpgkey: https://d3g5vo6xdbdb9a.cloudfront.net/GPG-KEY-opensearch
-        enabled: yes
-        gpgcheck: yes
     os_opensearch_extra_packages:
       FreeBSD: []
       Debian:
@@ -338,6 +331,9 @@ curl -vv --user admin:admin \
       Debian: |
         # /usr/bin/getconf CLK_TCK`
         -Dclk.tck=100
+      RedHat: |
+        # /usr/bin/getconf CLK_TCK`
+        -Dclk.tck=100
 
     os_opensearch_http_auth:
       FreeBSD:
@@ -350,6 +346,10 @@ curl -vv --user admin:admin \
         client_key: "{{ role_path }}/files/test/certs/admin-key.pem"
         # XXX the version of ansible on Ubuntu is 2.9.6. as such, ca_path
         # cannot be used.
+        validate_certs: no
+      RedHat:
+        client_cert: "{{ role_path }}/files/test/certs/admin.pem"
+        client_key: "{{ role_path }}/files/test/certs/admin-key.pem"
         validate_certs: no
     opensearch_http_auth: "{{ os_opensearch_http_auth[ansible_os_family] }}"
     opensearch_jvm_options: "{{ lookup('file', 'test/jvm_options') + os_opensearch_jvm_options[ansible_os_family] }}"
@@ -548,6 +548,16 @@ curl -vv --user admin:admin \
     # _____________________________________________haproxy
     project_backend_host: 127.0.0.1
     project_backend_port: 5601
+    os_haproxy_selinux_seport:
+      FreeBSD: {}
+      Debian: {}
+      RedHat:
+        ports:
+          - 80
+          - 5601
+        proto: tcp
+        setype: http_port_t
+    haproxy_selinux_seport: "{{ os_haproxy_selinux_seport[ansible_os_family] }}"
     haproxy_config: |
       global
         daemon
@@ -581,6 +591,14 @@ curl -vv --user admin:admin \
         uid 604
         gid 604
         pidfile /var/run/haproxy.pid
+      {% elif ansible_os_family == 'RedHat' %}
+      log         127.0.0.1 local2
+      chroot      /var/lib/haproxy
+      pidfile     /var/run/haproxy.pid
+      maxconn     4000
+      user        haproxy
+      group       haproxy
+      daemon
       {% endif %}
 
       defaults
@@ -621,6 +639,8 @@ curl -vv --user admin:admin \
         #CONFIG="/etc/haproxy/haproxy.cfg"
         #EXTRAOPTS="-de -m 16"
       OpenBSD: ""
+      RedHat: |
+        OPTIONS=""
     haproxy_flags: "{{ os_haproxy_flags[ansible_os_family] }}"
 ```
 

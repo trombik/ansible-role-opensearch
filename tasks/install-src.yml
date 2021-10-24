@@ -38,7 +38,8 @@
 - name: Create opensearch_src_pgp_key_fingerprint_file
   # XXX do not use FQCN here for older ansible version on Ubuntu
   shell:
-    cmd: "gpg --show-keys --with-colons {{ opensearch_src_pgp_key_file | quote }} > {{ opensearch_src_pgp_key_fingerprint_file | quote  }}"
+    # XXX gpg on CentoS is old
+    cmd: "gpg {% if ansible_os_family == 'Debian' %}--show-keys{% else %}--with-fingerprint{% endif %} --with-colons {{ opensearch_src_pgp_key_file | quote }} > {{ opensearch_src_pgp_key_fingerprint_file | quote  }}"
     creates: "{{ opensearch_src_pgp_key_fingerprint_file }}"
   environment:
     HOME: "/root"

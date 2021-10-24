@@ -5,13 +5,17 @@
     name: "{{ opensearch_extra_packages }}"
     state: present
 
-- name: Install opensearch_package
-  yum:
-    name: "{{ opensearch_package }}"
+- name: Install gpg
+  ansible.builtin.yum:
+    name: gpg
     state: present
 
+- name: "Include install-src.yml"
+  include: "install-src.yml"
+
 - name: Create /etc/sysconfig/opensearch
-  template:
+  # XXX not effective yet
+  ansible.builtin.template:
     src: RedHat.sysconfig.j2
     dest: /etc/sysconfig/opensearch
     owner: root

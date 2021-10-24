@@ -1,9 +1,11 @@
 ---
-- name: trombik.sysctl
-- name: trombik.java
-- name: trombik.freebsd_pkg_repo
-- name: trombik.apt_repo
-- name: trombik.redhat_repo
-- name: trombik.x509_certificate
-- name: trombik.opensearch_dashboards
-- name: trombik.haproxy
+roles:
+  - name: trombik.sysctl
+  - name: trombik.java
+  - name: trombik.freebsd_pkg_repo
+  - name: trombik.x509_certificate
+  - name: trombik.opensearch_dashboards
+  - name: trombik.haproxy
+collections:
+  - name: community.general
+  - name: ansible.posix

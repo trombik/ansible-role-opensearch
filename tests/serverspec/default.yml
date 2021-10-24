@@ -1,12 +1,18 @@
 ---
 - hosts: localhost
+  pre_tasks:
+    - name: Allow HTTP port
+      ansible.builtin.iptables:
+        chain: INPUT
+        destination_port: 80
+        protocol: tcp
+        jump: ACCEPT
+      when: ansible_os_family == 'RedHat'
   roles:
     - role: trombik.freebsd_pkg_repo
       when: ansible_os_family == "FreeBSD"
-    - role: trombik.redhat_repo
-      when: ansible_os_family == "RedHat"
     - role: trombik.java
-      # XXX the bundled jdk is used on Ubuntu
+      # XXX the bundled jdk is used on Ubuntu and CentOS
       when: ansible_os_family == "FreeBSD"
     - role: trombik.sysctl
     - ansible-role-opensearch
@@ -23,17 +29,6 @@
         mirror_type: none
         priority: 100
         state: present
-    redhat_repo:
-      opensearch7:
-        baseurl: https://artifacts.elastic.co/packages/oss-7.x/yum
-        gpgkey: https://artifacts.elastic.co/GPG-KEY-opensearch
-        gpgcheck: yes
-        enabled: yes
-      opensearch:
-        baseurl: https://d3g5vo6xdbdb9a.cloudfront.net/yum/noarch/
-        gpgkey: https://d3g5vo6xdbdb9a.cloudfront.net/GPG-KEY-opensearch
-        enabled: yes
-        gpgcheck: yes
     os_opensearch_extra_packages:
       FreeBSD: []
       Debian:
@@ -86,6 +81,9 @@
       Debian: |
         # /usr/bin/getconf CLK_TCK`
         -Dclk.tck=100
+      RedHat: |
+        # /usr/bin/getconf CLK_TCK`
+        -Dclk.tck=100
 
     os_opensearch_http_auth:
       FreeBSD:
@@ -98,6 +96,10 @@
         client_key: "{{ role_path }}/files/test/certs/admin-key.pem"
         # XXX the version of ansible on Ubuntu is 2.9.6. as such, ca_path
         # cannot be used.
+        validate_certs: no
+      RedHat:
+        client_cert: "{{ role_path }}/files/test/certs/admin.pem"
+        client_key: "{{ role_path }}/files/test/certs/admin-key.pem"
         validate_certs: no
     opensearch_http_auth: "{{ os_opensearch_http_auth[ansible_os_family] }}"
     opensearch_jvm_options: "{{ lookup('file', 'test/jvm_options') + os_opensearch_jvm_options[ansible_os_family] }}"
@@ -296,6 +298,16 @@
     # _____________________________________________haproxy
     project_backend_host: 127.0.0.1
     project_backend_port: 5601
+    os_haproxy_selinux_seport:
+      FreeBSD: {}
+      Debian: {}
+      RedHat:
+        ports:
+          - 80
+          - 5601
+        proto: tcp
+        setype: http_port_t
+    haproxy_selinux_seport: "{{ os_haproxy_selinux_seport[ansible_os_family] }}"
     haproxy_config: |
       global
         daemon
@@ -329,6 +341,14 @@
         uid 604
         gid 604
         pidfile /var/run/haproxy.pid
+      {% elif ansible_os_family == 'RedHat' %}
+      log         127.0.0.1 local2
+      chroot      /var/lib/haproxy
+      pidfile     /var/run/haproxy.pid
+      maxconn     4000
+      user        haproxy
+      group       haproxy
+      daemon
       {% endif %}
 
       defaults
@@ -369,4 +389,6 @@
         #CONFIG="/etc/haproxy/haproxy.cfg"
         #EXTRAOPTS="-de -m 16"
       OpenBSD: ""
+      RedHat: |
+        OPTIONS=""
     haproxy_flags: "{{ os_haproxy_flags[ansible_os_family] }}"
