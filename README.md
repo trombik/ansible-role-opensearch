@@ -79,6 +79,8 @@ dependency because TLS is not mandatory.
 | `opensearch_extra_plugin_files` | a list of extra files for plug-ins (see below) | `[]` |
 | `opensearch_include_role_x509_certificate` | if true, include `trombik.x509_certificate` during the play (`trombik.x509_certificate` must be listed in `requirements.yml`) | `yes` |
 | `opensearch_wait_for_cluster_status` | wait for cluster status to be this value after starting the service. valid value includes `red`, `yellow`, `green`, and `false`. set `false` value to disable | `no` |
+| `opensearch_wait_for_cluster_status_timeout` | timeout when wait for cluster status to be `opensearch_wait_for_cluster_status` | `10s` |
+| `opensearch_wait_for_cluster_status_retry` | retry when wait for cluster status to be `opensearch_wait_for_cluster_status` | `3` |
 
 ## `opensearch_plugins`
 

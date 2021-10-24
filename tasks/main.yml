@@ -149,7 +149,7 @@
 
 - name: Wait for opensearch cluster status to become opensearch_wait_for_cluster_status
   ansible.builtin.uri:
-    url: "{{ opensearch_http_url }}/_cluster/health?wait_for_status={{ opensearch_wait_for_cluster_status }}&timeout=30s"
+    url: "{{ opensearch_http_url }}/_cluster/health?wait_for_status={{ opensearch_wait_for_cluster_status }}&timeout={{ opensearch_wait_for_cluster_status_timeout }}"
     validate_certs: "{{ opensearch_http_auth['validate_certs'] | default(omit) }}"
     client_cert: "{{ opensearch_http_auth['client_cert'] | default(omit) }}"
     client_key: "{{ opensearch_http_auth['client_key'] | default(omit) }}"
@@ -157,7 +157,7 @@
     url_username: "{{ opensearch_http_auth['url_username'] | default(omit) }}"
     url_password: "{{ opensearch_http_auth['url_password'] | default(omit) }}"
   register: __register_opensearch_cluster_health
-  retries: 5
+  retries: "{{ opensearch_wait_for_cluster_status_retry }}"
   until:
     - "'json' in __register_opensearch_cluster_health"
     - "'status' in __register_opensearch_cluster_health['json']"
