@@ -301,3 +301,17 @@ describe command "curl -vv --cacert #{es_config_dir}/root-ca.pem --cert #{es_con
   its(:exit_status) { should eq 0 }
   its(:stderr) { should match(Regexp.escape("HTTP/1.1 200 OK")) }
 end
+
+describe "API" do
+  ca_cert = Shellwords.escape("#{es_config_dir}/root-ca.pem")
+  cert = Shellwords.escape("#{es_config_dir}/admin.pem")
+  key = Shellwords.escape("#{es_config_dir}/admin-key.pem")
+  api_url = "https://localhost:9200"
+  curl_flags = "-s --cacert #{ca_cert} --cert #{cert} --key #{key}"
+
+  describe command "curl #{curl_flags} --request GET #{Shellwords.escape(api_url + '/_cluster/health')}" do
+    its(:exit_status) { should eq 0 }
+    its(:stderr) { should eq "" }
+    its(:stdout_as_json) { should include("status" => "green") }
+  end
+end

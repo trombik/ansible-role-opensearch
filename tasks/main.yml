@@ -147,9 +147,9 @@
   when:
     - register_opensearch_start.changed
 
-- name: Wait for opensearch cluster status to become yellow or green
+- name: Wait for opensearch cluster status to become opensearch_wait_for_cluster_status
   ansible.builtin.uri:
-    url: "{{ opensearch_http_url }}/_cluster/health?wait_for_status=yellow&timeout=30s"
+    url: "{{ opensearch_http_url }}/_cluster/health?wait_for_status={{ opensearch_wait_for_cluster_status }}&timeout=30s"
     validate_certs: "{{ opensearch_http_auth['validate_certs'] | default(omit) }}"
     client_cert: "{{ opensearch_http_auth['client_cert'] | default(omit) }}"
     client_key: "{{ opensearch_http_auth['client_key'] | default(omit) }}"
@@ -162,6 +162,8 @@
     - "'json' in __register_opensearch_cluster_health"
     - "'status' in __register_opensearch_cluster_health['json']"
     - __register_opensearch_cluster_health['json']['status'] == 'yellow' or __register_opensearch_cluster_health['json']['status'] == 'green'
+  when:
+    - (opensearch_wait_for_cluster_status)
 
 - name: Run post_command in opensearch_extra_plugin_files
   # XXX at the moment, only security plugin needs `post_command`. for the

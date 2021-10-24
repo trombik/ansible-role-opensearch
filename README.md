@@ -2,8 +2,7 @@
 
 `ansible` role to manage `opensearch`.
 
-The role is alpha. Role variables are not correctly described in this
-`README`. Expect bugs.
+The role is beta.
 
 ## For FreeBSD users
 
@@ -79,6 +78,7 @@ dependency because TLS is not mandatory.
 | `opensearch_java_home` | `JAVA_HOME` environment variable | `{{ __opensearch_java_home }}` |
 | `opensearch_extra_plugin_files` | a list of extra files for plug-ins (see below) | `[]` |
 | `opensearch_include_role_x509_certificate` | if true, include `trombik.x509_certificate` during the play (`trombik.x509_certificate` must be listed in `requirements.yml`) | `yes` |
+| `opensearch_wait_for_cluster_status` | wait for cluster status to be this value after starting the service. valid value includes `red`, `yellow`, `green`, and `false`. set `false` value to disable | `no` |
 
 ## `opensearch_plugins`
 
