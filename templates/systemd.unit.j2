@@ -21,13 +21,14 @@ EnvironmentFile=/etc/sysconfig/{{ opensearch_service }}
 {% endif %}
 
 Environment=OPENSEARCH_PATH_CONF={{ opensearch_conf_dir }}
+Environment=OPENSEARCH_JAVA_OPTS=
 Environment=MAX_OPEN_FILES=65535
 Environment=ES_STARTUP_SLEEP_TIME=5
 Environment=MAX_LOCKED_MEMORY=unlimited
+Environment=OPENSEARCH_STARTUP_SLEEP_TIME=5
 
 LimitNOFILE=${MAX_OPEN_FILES}
 LimitMEMLOCK=${MAX_LOCKED_MEMORY}
-ExecStartPost=/bin/sleep ${ES_STARTUP_SLEEP_TIME}
 
 [Install]
 WantedBy=multi-user.target
