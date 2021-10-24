@@ -193,3 +193,4 @@
   when:
     - item['changed'] == true
     - "'post_command' in item['item']"
+    - item['item']['post_command']['when'] | bool
