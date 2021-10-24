@@ -117,7 +117,7 @@ It accepts the following keys:
 |-----|-------------|------------|
 | `cmd` | The command to run | yes |
 | `args` | A dict for `args`. Currently `chdir`, `creates`, and `removes` are supported. | no |
-| `when` | Either `yes` or `no`. When `yes`, the command is executed, not when `no` | yes |
+| `enabled` | Either `yes` or `no`. When `yes`, the command is executed, not when `no` | yes |
 
 `post_command` is primarily designed for `securityadmin.sh`.
 See
