@@ -9,7 +9,7 @@ The role is beta.
 The example, not the role itself, requires my own port of
 `opensearch-dashboards` for FreeBSD, which can be found at
 [trombik/freebsd-ports-opensearch](https://github.com/trombik/freebsd-ports-opensearch).
-The example uses [`trombik.opensearch_dashboars`](https://github.com/trombik/ansible-role-opensearch_dashboards).
+The example uses [`trombik.opensearch_dashboards`](https://github.com/trombik/ansible-role-opensearch_dashboards).
 However, the port and the role depend on `www/node10`, which is EoLed and
 deprecated.
 
