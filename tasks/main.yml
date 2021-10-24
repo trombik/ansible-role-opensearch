@@ -13,7 +13,7 @@
   when: opensearch_include_role_x509_certificate
 
 - name: Create data directory
-  file:
+  ansible.builtin.file:
     path: "{{ opensearch_db_dir }}"
     state: directory
     owner: "{{ opensearch_user }}"
@@ -21,7 +21,7 @@
     mode: 0755
 
 - name: Create opensearch_log_dir directory
-  file:
+  ansible.builtin.file:
     path: "{{ opensearch_log_dir }}"
     state: directory
     owner: "{{ opensearch_user }}"
@@ -30,7 +30,7 @@
 
 - name: Create path.scripts directory if specified
   # XXX this should have been created by package
-  file:
+  ansible.builtin.file:
     path: "{{ opensearch_scripts_dir }}"
     state: directory
     mode: 0755
@@ -38,7 +38,7 @@
     - opensearch_scripts_dir | length > 0
 
 - name: Create opensearch_conf_dir
-  file:
+  ansible.builtin.file:
     path: "{{ opensearch_conf_dir }}"
     # XXX OpenDistroSecurityPlugin insists it should be 0700
     # [c.a.o.s.OpenDistroSecurityPlugin] [testnode] Directory /etc/opensearch has insecure file permissions (should be 0700)
@@ -49,7 +49,7 @@
     state: directory
 
 - name: Create jvm.options
-  template:
+  ansible.builtin.template:
     src: jvm.options.j2
     dest: "{{ opensearch_conf_dir }}/jvm.options"
     owner: "{{ opensearch_user }}"
@@ -59,7 +59,7 @@
     - Restart opensearch
 
 - name: Create log4j2.properties
-  template:
+  ansible.builtin.template:
     src: log4j2.properties.j2
     dest: "{{ opensearch_conf_dir }}/log4j2.properties"
     owner: "{{ opensearch_user }}"
@@ -69,7 +69,7 @@
     - Restart opensearch
 
 - name: Create opensearch.yml
-  template:
+  ansible.builtin.template:
     src: opensearch.yml.j2
     dest: "{{ opensearch_conf_file }}"
     mode: 0440
@@ -86,7 +86,7 @@
   changed_when: False
 
 - name: Create plugins directory
-  file:
+  ansible.builtin.file:
     path: "{{ opensearch_plugins_dir }}"
     # owner: "{{ opensearch_user }}"
     # group: "{{ opensearch_group }}"
@@ -103,7 +103,7 @@
     - "not (shell_output.stdout is search(item['name']))"
 
 - name: Create basedir of opensearch_extra_plugin_files
-  file:
+  ansible.builtin.file:
     path: "{{ opensearch_plugins_dir }}/{{ item.path | dirname }}"
     state: directory
     mode: 0755
@@ -112,7 +112,7 @@
     - "(not 'state' in item) or (item['state'] == 'present')"
 
 - name: Create opensearch_extra_plugin_files
-  template:
+  ansible.builtin.template:
     src: "{{ item.type }}.j2"
     dest: "{{ opensearch_plugins_dir }}/{{ item.path }}"
     mode: "{{ item.mode | default(omit) }}"
@@ -124,7 +124,7 @@
     - "(not 'state' in item) or (item['state'] == 'present')"
 
 - name: Delete opensearch_extra_plugin_files
-  file:
+  ansible.builtin.file:
     path: "{{ opensearch_plugins_dir }}/{{ item.path }}"
     state: absent
     mode: 0755
@@ -134,14 +134,14 @@
     - "item['state'] == 'absent'"
 
 - name: Start opensearch
-  service:
+  ansible.builtin.service:
     name: "{{ opensearch_service }}"
     state: started
     enabled: yes
   register: register_opensearch_start
 
 - name: Wait for opensearch to start in task
-  wait_for:
+  ansible.builtin.wait_for:
     host: "{{ opensearch_http_host }}"
     port: "{{ opensearch_http_port }}"
   when:
