@@ -1,7 +1,7 @@
 ---
 
 - name: Install opensearch_extra_packages
-  yum:
+  ansible.builtin.yum:
     name: "{{ opensearch_extra_packages }}"
     state: present
 

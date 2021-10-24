@@ -1,12 +1,12 @@
 ---
 
 - name: Install opensearch_extra_packages
-  pkgng:
+  ansible.builtin.pkgng:
     name: "{{ opensearch_extra_packages }}"
     state: present
 
 - name: Install opensearch
-  pkgng:
+  ansible.builtin.pkgng:
     name: "{{ opensearch_package }}"
     state: present
 
@@ -17,7 +17,7 @@
     removes: "{{ opensearch_plugins_dir }}/opensearch-performance-analyzer"
 
 - name: Create rc.subr flagment
-  template:
+  ansible.builtin.template:
     src: FreeBSD.rc.j2
     dest: /etc/rc.conf.d/opensearch
     mode: 0644

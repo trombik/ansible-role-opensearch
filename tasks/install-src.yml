@@ -2,11 +2,11 @@
 # a huge hack until when Amazon or distributions release packages.
 
 - name: Create opensearch_group
-  group:
+  ansible.builtin.group:
     name: "{{ opensearch_group }}"
 
 - name: Create opensearch_user
-  user:
+  ansible.builtin.user:
     name: "{{ opensearch_user }}"
     group: "{{ opensearch_group }}"
     home: "{{ opensearch_root_dir }}"
