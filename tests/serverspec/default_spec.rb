@@ -163,7 +163,6 @@ when "ubuntu"
     it { should be_owned_by default_user }
     it { should be_grouped_into default_group }
     its(:content) { should match(/Managed by ansible/) }
-    its(:content) { should match(/MAX_OPEN_FILES=65535/) }
   end
 when "redhat"
   describe file("/etc/sysconfig/opensearch") do
@@ -172,7 +171,6 @@ when "redhat"
     it { should be_owned_by default_user }
     it { should be_grouped_into default_group }
     its(:content) { should match(/Managed by ansible/) }
-    its(:content) { should match(/MAX_OPEN_FILES=65535/) }
   end
 when "openbsd"
   describe file("/etc/opensearch/jvm.in") do
@@ -312,6 +310,13 @@ describe "API" do
   describe command "curl #{curl_flags} --request GET #{Shellwords.escape(api_url + '/_cluster/health')}" do
     its(:exit_status) { should eq 0 }
     its(:stderr) { should eq "" }
-    its(:stdout_as_json) { should include("status" => "green") }
+    its(:stdout_as_json) { should_not include("status" => "red") }
+  end
+end
+
+describe "Log" do
+  describe file es_log_file do
+    its(:content) { should_not match(/max virtual memory areas vm.max_map_count .* is too low/) }
+    its(:content) { should_not match(/max file descriptors .* is too low/) }
   end
 end
