@@ -22,6 +22,7 @@ EnvironmentFile=/etc/sysconfig/{{ opensearch_service }}
 
 Environment=OPENSEARCH_PATH_CONF={{ opensearch_conf_dir }}
 Environment=OPENSEARCH_JAVA_OPTS=
+Environment=OPENSEARCH_TMPDIR=
 Environment=MAX_OPEN_FILES=65535
 Environment=ES_STARTUP_SLEEP_TIME=5
 Environment=MAX_LOCKED_MEMORY=unlimited
