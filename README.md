@@ -313,10 +313,10 @@ An example to install:
       Debian:
         # see https://opensearch.org/docs/latest/opensearch/install/important-settings/
         vm.max_map_count: 262144
-      RedHat: []
+      RedHat:
+        vm.max_map_count: 262144
     sysctl: "{{ os_sysctl[ansible_os_family] }}"
-
-
+    opensearch_wait_for_cluster_status: yellow
     os_opensearch_package:
       FreeBSD: "{{ __opensearch_package }}"
       Debian: "{{ __opensearch_package }}"
@@ -327,22 +327,23 @@ An example to install:
       Debian: |
         ES_PATH_CONF={{ opensearch_conf_dir }}
         ES_STARTUP_SLEEP_TIME=5
-        MAX_OPEN_FILES=65535
-        MAX_LOCKED_MEMORY=unlimited
       RedHat: |
         ES_PATH_CONF={{ opensearch_conf_dir }}
         ES_STARTUP_SLEEP_TIME=5
-        MAX_OPEN_FILES=65535
-        MAX_LOCKED_MEMORY=unlimited
     opensearch_flags: "{{ os_opensearch_flags[ansible_os_family] }}"
     os_opensearch_jvm_options:
       FreeBSD: ""
       Debian: |
+        # see opensearch-tar-install.sh
         # /usr/bin/getconf CLK_TCK`
         -Dclk.tck=100
+        -Djdk.attach.allowAttachSelf=true
+        -Djava.security.policy={{ opensearch_root_dir }}/plugins/opensearch-performance-analyzer/pa_config/opensearch_security.policy
       RedHat: |
         # /usr/bin/getconf CLK_TCK`
         -Dclk.tck=100
+        -Djdk.attach.allowAttachSelf=true
+        -Djava.security.policy={{ opensearch_root_dir }}/plugins/opensearch-performance-analyzer/pa_config/opensearch_security.policy
 
     os_opensearch_http_auth:
       FreeBSD:
@@ -416,6 +417,7 @@ An example to install:
       cmd: "{{ project_securityadmin_bin }} -icl -nhnv -cacert {{ opensearch_conf_dir }}/root-ca.pem -cert {{ opensearch_conf_dir }}/admin.pem -key {{ opensearch_conf_dir }}/admin-key.pem"
       args:
         chdir: "{{ project_security_plugin_dir }}/securityconfig"
+      when: "{% if 1 == 1 %}yes{% else %}no{% endif %}"
 
     opensearch_plugins: []
     opensearch_extra_plugin_files:
