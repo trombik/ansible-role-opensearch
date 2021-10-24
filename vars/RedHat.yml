@@ -4,9 +4,10 @@ __opensearch_group: opensearch
 __opensearch_log_dir: /var/log/opensearch
 __opensearch_db_dir: /var/lib/opensearch
 __opensearch_package: opensearch
-__opensearch_conf_dir: /etc/opensearch
+__opensearch_conf_dir: /usr/local/opensearch/config
+__opensearch_root_dir: /usr/local/opensearch
 __opensearch_scripts_dir: ""
-__opensearch_plugins_dir: /usr/share/opensearch/plugins
-__opensearch_plugin_command: /usr/share/opensearch/bin/opensearch-plugin
+__opensearch_plugins_dir: /usr/local/opensearch/plugins
+__opensearch_plugin_command: /usr/local/opensearch/bin/opensearch-plugin
 __opensearch_service: opensearch
-__opensearch_java_home: ""
+__opensearch_java_home: /usr/local/opensearch/jdk
