@@ -1,18 +1,33 @@
 # Managed by ansible
 [Unit]
 Description=opensearch daemon
+Wants=network-online.target
+After=network-online.target
+Documentation=https://github.com/trombik/ansible-role-opensearch
 
 [Service]
+EnvironmentFile={% if ansible_os_family == 'Debian' %}/etc/default/opensearch{% elif ansible_os_family == 'RedHat' %}/etc/sysconfig/opensearch{% endif %}
+
 ExecStart={{ opensearch_root_dir }}/bin/opensearch
 ExecStop=/bin/kill -s QUIT $MAINPID
 Type=simple
 User={{ opensearch_user }}
 Group={{ opensearch_group }}
-Environment=OPENSEARCH_PATH_CONF={{ opensearch_conf_dir }}
+
 {% if ansible_os_family == 'Debian' %}
 EnvironmentFile=/etc/default/{{ opensearch_service }}
 {% elif ansible_os_family == 'RedHat' %}
 EnvironmentFile=/etc/sysconfig/{{ opensearch_service }}
 {% endif %}
+
+Environment=OPENSEARCH_PATH_CONF={{ opensearch_conf_dir }}
+Environment=MAX_OPEN_FILES=65535
+Environment=ES_STARTUP_SLEEP_TIME=5
+Environment=MAX_LOCKED_MEMORY=unlimited
+
+LimitNOFILE=${MAX_OPEN_FILES}
+LimitMEMLOCK=${MAX_LOCKED_MEMORY}
+ExecStartPost=/bin/sleep ${ES_STARTUP_SLEEP_TIME}
+
 [Install]
 WantedBy=multi-user.target
