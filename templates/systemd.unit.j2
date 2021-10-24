@@ -6,7 +6,12 @@ After=network-online.target
 Documentation=https://github.com/trombik/ansible-role-opensearch
 
 [Service]
-EnvironmentFile={% if ansible_os_family == 'Debian' %}/etc/default/opensearch{% elif ansible_os_family == 'RedHat' %}/etc/sysconfig/opensearch{% endif %}
+WorkingDirectory={{ opensearch_root_dir }}
+{% if ansible_os_family == 'Debian' -%}
+EnvironmentFile=/etc/default/opensearch
+{% elif ansible_os_family == 'RedHat' -%}
+EnvironmentFile=/etc/sysconfig/opensearch
+{% endif -%}
 
 ExecStart={{ opensearch_root_dir }}/bin/opensearch
 ExecStop=/bin/kill -s QUIT $MAINPID
@@ -20,16 +25,19 @@ EnvironmentFile=/etc/default/{{ opensearch_service }}
 EnvironmentFile=/etc/sysconfig/{{ opensearch_service }}
 {% endif %}
 
+# these are handled by opensearch
 Environment=OPENSEARCH_PATH_CONF={{ opensearch_conf_dir }}
 Environment=OPENSEARCH_JAVA_OPTS=
 Environment=OPENSEARCH_TMPDIR=
-Environment=MAX_OPEN_FILES=65535
 Environment=ES_STARTUP_SLEEP_TIME=5
-Environment=MAX_LOCKED_MEMORY=unlimited
 Environment=OPENSEARCH_STARTUP_SLEEP_TIME=5
 
-LimitNOFILE=${MAX_OPEN_FILES}
-LimitMEMLOCK=${MAX_LOCKED_MEMORY}
+# systemd-specific
+LimitNOFILE=65535
+LimitNPROC=4096
+LimitAS=infinity
+LimitFSIZE=infinity
+LimitMEMLOCK=unlimited
 
 [Install]
 WantedBy=multi-user.target
