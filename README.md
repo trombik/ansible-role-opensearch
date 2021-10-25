@@ -21,6 +21,9 @@ for the upgrade plan.
 The role installs `opensearch` from the official tar archive. This
 is a huge hack until when Amazon or distributions release packages.
 
+Role variables relating to source installation, `opensearch_src_*`,  are
+deliberately not documented.
+
 The role does not install JDK package. The bundled JDK is used instead.
 
 The role imports a PGP key into `root`'s keyring from the upstream project to
@@ -122,7 +125,7 @@ It accepts the following keys:
 `post_command` is primarily designed for `securityadmin.sh`.
 See
 [Apply changes using securityadmin.sh](https://opensearch.org/docs/latest/security-plugin/configuration/security-admin/)
-for more details.
+for more details. Use `enabled` to run `securityadmin.sh` on a specific node.
 
 ## `opensearch_http_auth`
 
@@ -255,6 +258,26 @@ An example to install:
 * `opensearch`
 * `opensearch-dashboards`
 * `haproxy`
+* `fluentd`
+
+The example does not work on `CentOS` yet.
+
+`haproxy` is a reverse proxy for `opensearch-dashboards`. Logs from `haproxy`
+are sent to a local `fluentd` `syslog` listener. The `fluentd` then processes
+the logs, and sends them to `opensearch`. The index pattern is `logstash-*`.
+
+Note that the `fluentd` `elasticsearch` output plugin does not support
+`opensearch`. The example workarounds the issue by:
+
+* installing specific versions of `fluentd-elasticsearch-plugin` and
+  `elasticsearch`-related gems
+* setting `verify_es_version_at_startup` and `default_elasticsearch_version`
+  in `fluentd.conf`
+
+See [Issue 915](https://github.com/uken/fluent-plugin-elasticsearch/issues/915)
+for more details.
+
+Use `admin` user with password `admin` to login to the dashboards.
 
 ```yaml
 ---
@@ -270,12 +293,17 @@ An example to install:
   roles:
     - role: trombik.freebsd_pkg_repo
       when: ansible_os_family == "FreeBSD"
+    - name: trombik.apt_repo
+      when: ansible_os_family == 'Debian'
+    - name: trombik.redhat_repo
+      when: ansible_os_family == 'RedHat'
     - role: trombik.java
       # XXX the bundled jdk is used on Ubuntu and CentOS
       when: ansible_os_family == "FreeBSD"
     - role: trombik.sysctl
     - ansible-role-opensearch
     - role: trombik.opensearch_dashboards
+    - role: trombik.fluentd
     - role: trombik.haproxy
   vars:
     # XXX use my own package as the package in the official package tree is
@@ -572,15 +600,16 @@ An example to install:
     haproxy_config: |
       global
         daemon
+        # increase default 1024  maximum line length to 65535. it truncates
+        # logs when longer than this value.
+        log 127.0.0.1:5140 len 65535 format rfc3164 local0 info
+
       {% if ansible_os_family == 'FreeBSD' %}
       # FreeBSD package does not provide default
         maxconn 4096
-        log /var/run/log local0 notice
           user {{ haproxy_user }}
           group {{ haproxy_group }}
       {% elif ansible_os_family == 'Debian' %}
-        log /dev/log  local0
-        log /dev/log  local1 notice
         chroot {{ haproxy_chroot_dir }}
         stats socket /run/haproxy/admin.sock mode 660 level admin expose-fd listeners
         stats timeout 30s
@@ -596,20 +625,18 @@ An example to install:
           ssl-default-bind-ciphersuites TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256
           ssl-default-bind-options ssl-min-ver TLSv1.2 no-tls-tickets
       {% elif ansible_os_family == 'OpenBSD' %}
-        log 127.0.0.1   local0 debug
         maxconn 1024
         chroot {{ haproxy_chroot_dir }}
         uid 604
         gid 604
         pidfile /var/run/haproxy.pid
       {% elif ansible_os_family == 'RedHat' %}
-      log         127.0.0.1 local2
-      chroot      /var/lib/haproxy
-      pidfile     /var/run/haproxy.pid
-      maxconn     4000
-      user        haproxy
-      group       haproxy
-      daemon
+        chroot      /var/lib/haproxy
+        pidfile     /var/run/haproxy.pid
+        maxconn     4000
+        user        haproxy
+        group       haproxy
+        daemon
       {% endif %}
 
       defaults
@@ -618,8 +645,6 @@ An example to install:
         timeout connect 5s
         timeout client 10s
         timeout server 10s
-        option  httplog
-        option  dontlognull
         retries 3
         maxconn 2000
       {% if ansible_os_family == 'Debian' %}
@@ -637,6 +662,21 @@ An example to install:
       frontend http-in
         bind *:80
         default_backend servers
+        unique-id-format %{+X}o\ %ci:%cp_%fi:%fp_%Ts_%rt:%pid
+        http-request capture req.fhdr(Host) len 128
+        http-request capture req.fhdr(Referer) len 1024
+        http-request capture req.fhdr(User-Agent) len 1024
+        http-request capture req.fhdr(Accept) len 1024
+        # custom log-format in JSON.
+        # to create your own JSON structure:
+        #
+        # cd files/test/haproxy
+        # ruby ./yaml2logformat.rb log.yml
+        #
+        # see available variables at:
+        # 8.2.4. Custom log format
+        # https://www.haproxy.com/documentation/hapee/latest/onepage/#8.2.4
+        log-format '{"bytes_read":%B,"hostname":"%H","http":{"method":"%HM","uri":"%HP","query":"%HQ","version":"%HV"},"unique-id":"%ID","status_code":%ST,"gmt_date_time":"%T","timestamp":%Ts,"bytes_uploaded":%U,"backend_name":"%b","beconn":%bc,"backend_queue":%bq,"client_ip":"%ci","client_port":%cp,"frontend_name":"%f","frontend_ip":"%fi","frontend_port":%fp,"ssl":{"ciphers":"%sslc","version":"%sslv"},"request":{"headers":{"host":"%[capture.req.hdr(0),json(utf8ps)]","referer":"%[capture.req.hdr(1),json(utf8ps)]","ua":"%[capture.req.hdr(2),json(utf8ps)]","accept":"%[capture.req.hdr(3),json(utf8ps)]"}}}'
 
       backend servers
         option forwardfor
@@ -653,6 +693,103 @@ An example to install:
       RedHat: |
         OPTIONS=""
     haproxy_flags: "{{ os_haproxy_flags[ansible_os_family] }}"
+
+    # _____________________________________________fluentd
+    fluentd_system_config: |
+      log_level debug
+      suppress_config_dump
+    fluentd_configs:
+      listen_on_5140:
+        enabled: true
+        config: |
+          <source>
+            @type syslog
+            port 5140
+            bind 127.0.0.1
+            tag haproxy
+            <parse>
+              message_format rfc3164
+            </parse>
+          </source>
+          <filter haproxy.**>
+            @type parser
+            <parse>
+              @type json
+              json_parser json
+              time_type string
+              time_key gmt_date_time
+              time_format %d/%b/%Y:%H:%M:%S %z
+            </parse>
+            key_name message
+            reserve_data false
+            replace_invalid_sequence true
+          </filter>
+          <match haproxy.**>
+            @type elasticsearch
+            # do not use 127.0.0.1 here. use CN in the cert
+            host localhost
+            port 9200
+            scheme https
+            ssl_version TLSv1_2
+            user "logstash"
+            password "logstash"
+            with_transporter_log true
+            ca_file {{ opensearch_conf_dir }}/root-ca.pem
+            ssl_verify true
+            logstash_format true
+
+            # XXX a workaround to use opensearch with elasticsearch output
+            # plugin. see also fluentd_gems below.
+            #
+            # https://github.com/uken/fluent-plugin-elasticsearch/issues/915
+            verify_es_version_at_startup false
+            default_elasticsearch_version 7
+
+            # for debug
+            with_transporter_log true
+            <buffer>
+              timekey 1d
+              timekey_use_utc true
+              timekey_wait 10m
+            </buffer>
+          </match>
+    fluentd_gems:
+      - name: elasticsearch-transport
+        version: 7.13.3
+        state: present
+      - name: elasticsearch-api
+        version: 7.13.3
+        state: present
+      - name: elasticsearch
+        version: 7.13.3
+        state: present
+      - name: fluent-plugin-elasticsearch
+        version: 5.1.0
+        state: present
+
+    os_fluentd_flags:
+      FreeBSD: |
+        fluentd_flags="-p {{ fluentd_plugin_dir }} --log {{ fluentd_log_file }}"
+      Debian: |
+        TD_AGENT_LOG_FILE="{{ fluentd_log_file }}"
+        TD_AGENT_OPTIONS="-p {{ fluentd_plugin_dir }}"
+        STOPTIMEOUT=180
+      RedHat: |
+        TD_AGENT_LOG_FILE="{{ fluentd_log_file }}"
+        TD_AGENT_OPTIONS=""
+      OpenBSD: "--daemon /var/run/fluentd/fluentd.pid --config {{ fluentd_config_file }} -p {{ fluentd_plugin_dir }} --log {{ fluentd_log_file }}"
+    fluentd_flags: "{{ os_fluentd_flags[ansible_os_family] }}"
+
+    # _____________________________________________apt
+    apt_repo_keys_to_add:
+      - https://packages.treasuredata.com/GPG-KEY-td-agent
+    apt_repo_to_add:
+      - "deb http://packages.treasuredata.com/4/ubuntu/{{ ansible_distribution_release }}/ {{ ansible_distribution_release }} contrib"
+    # _____________________________________________redhat_repo
+    redhat_repo:
+      treasuredata:
+        baseurl: http://packages.treasuredata.com/4/redhat/$releasever/$basearch
+        gpgkey: https://packages.treasuredata.com/GPG-KEY-td-agent
 ```
 
 # License

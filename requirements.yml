@@ -5,7 +5,10 @@ roles:
   - name: trombik.freebsd_pkg_repo
   - name: trombik.x509_certificate
   - name: trombik.opensearch_dashboards
+  - name: trombik.fluentd
   - name: trombik.haproxy
+  - name: trombik.apt_repo
+  - name: trombik.redhat_repo
 collections:
   - name: community.general
   - name: ansible.posix
