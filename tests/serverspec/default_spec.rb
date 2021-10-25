@@ -42,6 +42,12 @@ es_plugins_directory = "#{es_root_dir}/plugins"
 es_data_directory = "/var/lib/opensearch"
 es_log_directory  = "/var/log/opensearch"
 es_log_file = "#{es_log_directory}/#{cluster_name}.log"
+fluentd_log_file = case os[:family]
+                   when "freebsd"
+                     "/var/log/fluentd/fluentd.log"
+                   else
+                     "/var/log/td-agent/td-agent.log"
+                   end
 public_certs = [
   "admin.pem",
   "node.pem",
@@ -54,6 +60,13 @@ private_certs = [
 ]
 os_admin_user = "admin"
 os_admin_password = "admin"
+ports = [
+  9200, # opensearch
+  9300, # opensearch cluster
+  80,   # haproxy
+  5601, # opensearch dashbords
+  5140, # fluentd
+]
 
 case os[:family]
 when "freebsd"
@@ -182,7 +195,7 @@ when "openbsd"
   end
 end
 
-[9200, 9300, 80, 5601].each do |p|
+ports.each do |p|
   describe port(p) do
     it { should be_listening }
   end
@@ -318,5 +331,15 @@ describe "Log" do
   describe file es_log_file do
     its(:content) { should_not match(/max virtual memory areas vm.max_map_count .* is too low/) }
     its(:content) { should_not match(/max file descriptors .* is too low/) }
+  end
+
+  describe file fluentd_log_file do
+    it { should exist }
+    it { should be_file }
+    # test if logs from haproxy are correctly parsed by fluentd
+    its(:content) do
+      pending "logs from haproxy itself are not yet handled by fluentd"
+      should_not match(/Fluent::Plugin::Parser::ParserError error="pattern not matched with data/)
+    end
   end
 end
