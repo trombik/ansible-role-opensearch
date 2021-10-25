@@ -290,6 +290,23 @@ Use `admin` user with password `admin` to login to the dashboards.
         protocol: tcp
         jump: ACCEPT
       when: ansible_os_family == 'RedHat'
+    - name: Accept UDP syslog and forward to fluentd
+      ansible.builtin.copy:
+        content: |
+          $ModLoad imudp
+          $UDPServerRun 514
+          local2.* @127.0.01:5140
+        dest: /etc/rsyslog.d/haproxy.conf
+        mode: "0644"
+      register: __register_rsyslog_centos
+      when: ansible_os_family == 'RedHat'
+    - name: Restart rsyslog
+      ansible.builtin.service:
+        name: rsyslog
+        state: restarted
+      when:
+        - ansible_os_family == 'RedHat'
+        - __register_rsyslog_centos['changed']
   roles:
     - role: trombik.freebsd_pkg_repo
       when: ansible_os_family == "FreeBSD"
@@ -602,7 +619,12 @@ Use `admin` user with password `admin` to login to the dashboards.
         daemon
         # increase default 1024  maximum line length to 65535. it truncates
         # logs when longer than this value.
+        {% if ansible_os_family == 'RedHat' %}
+        log 127.0.0.1:514 local2
+        {% else %}
         log 127.0.0.1:5140 len 65535 format rfc3164 local0 info
+        {% endif %}
+
 
       {% if ansible_os_family == 'FreeBSD' %}
       # FreeBSD package does not provide default
@@ -663,10 +685,12 @@ Use `admin` user with password `admin` to login to the dashboards.
         bind *:80
         default_backend servers
         unique-id-format %{+X}o\ %ci:%cp_%fi:%fp_%Ts_%rt:%pid
+        {% if ansible_os_family != 'RedHat' %}
         http-request capture req.fhdr(Host) len 128
         http-request capture req.fhdr(Referer) len 1024
         http-request capture req.fhdr(User-Agent) len 1024
         http-request capture req.fhdr(Accept) len 1024
+        {% endif %}
         # custom log-format in JSON.
         # to create your own JSON structure:
         #
@@ -676,7 +700,14 @@ Use `admin` user with password `admin` to login to the dashboards.
         # see available variables at:
         # 8.2.4. Custom log format
         # https://www.haproxy.com/documentation/hapee/latest/onepage/#8.2.4
+        #
+        {% if ansible_os_family == 'RedHat' %}
+        # XXX haproxy for CentOS is 1.x. that version does not understand
+        # `http-request capture`. use simplified version of JSON log.
+        log-format '{"bytes_read":%B,"hostname":"%H","http":{"method":"%HM","uri":"%HP","query":"%HQ","version":"%HV"},"unique-id":"%ID","status_code":%ST,"gmt_date_time":"%T","timestamp":%Ts,"bytes_uploaded":%U,"backend_name":"%b","beconn":%bc,"backend_queue":%bq,"client_ip":"%ci","client_port":%cp,"frontend_name":"%f","frontend_ip":"%fi","frontend_port":%fp,"ssl":{"ciphers":"%sslc","version":"%sslv"}}'
+        {% else %}
         log-format '{"bytes_read":%B,"hostname":"%H","http":{"method":"%HM","uri":"%HP","query":"%HQ","version":"%HV"},"unique-id":"%ID","status_code":%ST,"gmt_date_time":"%T","timestamp":%Ts,"bytes_uploaded":%U,"backend_name":"%b","beconn":%bc,"backend_queue":%bq,"client_ip":"%ci","client_port":%cp,"frontend_name":"%f","frontend_ip":"%fi","frontend_port":%fp,"ssl":{"ciphers":"%sslc","version":"%sslv"},"request":{"headers":{"host":"%[capture.req.hdr(0),json(utf8ps)]","referer":"%[capture.req.hdr(1),json(utf8ps)]","ua":"%[capture.req.hdr(2),json(utf8ps)]","accept":"%[capture.req.hdr(3),json(utf8ps)]"}}}'
+        {% endif %}
 
       backend servers
         option forwardfor
