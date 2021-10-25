@@ -1,0 +1,80 @@
+---
+bytes_read:
+  type: numeric
+  name: "%B"
+hostname:
+  type: string
+  name: "%H"
+http:
+  method:
+    type: string
+    name: "%HM"
+  uri:
+    type: string
+    name: "%HP"
+  query:
+    type: string
+    name: "%HQ"
+  version:
+    type: string
+    name: "%HV"
+unique-id:
+  type: string
+  name: "%ID"
+status_code:
+  type: numeric
+  name: "%ST"
+gmt_date_time:
+  type: date
+  name: "%T"
+timestamp:
+  type: numeric
+  name: "%Ts"
+bytes_uploaded:
+  type: numeric
+  name: "%U"
+backend_name:
+  type: string
+  name: "%b"
+beconn:
+  type: numeric
+  name: "%bc"
+backend_queue:
+  type: numeric
+  name: "%bq"
+client_ip:
+  type: IP
+  name: "%ci"
+client_port:
+  type: numeric
+  name: "%cp"
+frontend_name:
+  type: string
+  name: "%f"
+frontend_ip:
+  type: IP
+  name: "%fi"
+frontend_port:
+  type: numeric
+  name: "%fp"
+ssl:
+  ciphers:
+    type: string
+    name: "%sslc"
+  version:
+    type: string
+    name: "%sslv"
+request:
+  headers:
+    host:
+      type: string
+      name: "%[capture.req.hdr(0),json(utf8ps)]"
+    referer:
+      type: string
+      name: "%[capture.req.hdr(1),json(utf8ps)]"
+    ua:
+      type: string
+      name: "%[capture.req.hdr(2),json(utf8ps)]"
+    accept:
+      type: string
+      name: "%[capture.req.hdr(3),json(utf8ps)]"
