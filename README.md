@@ -598,22 +598,22 @@ Use `admin` user with password `admin` to login to the dashboards.
     haproxy_config: |
       global
         daemon
-        {% if ansible_os_family != 'RedHat' %}
+      {% if ansible_os_family != 'RedHat' %}
         # increase default 1024  maximum line length to 65535. it truncates
         # logs when longer than this value.
         log 127.0.0.1:5140 len 65535 format rfc3164 local0 info
-        {% else %}
+      {% else %}
         # XXX haproxy 1.x does not understand `format`.
         log 127.0.0.1:5140 len 65535 local2
         log-send-hostname
-        {% endif %}
+      {% endif %}
 
 
       {% if ansible_os_family == 'FreeBSD' %}
       # FreeBSD package does not provide default
         maxconn 4096
-          user {{ haproxy_user }}
-          group {{ haproxy_group }}
+        user {{ haproxy_user }}
+        group {{ haproxy_group }}
       {% elif ansible_os_family == 'Debian' %}
         chroot {{ haproxy_chroot_dir }}
         stats socket /run/haproxy/admin.sock mode 660 level admin expose-fd listeners
@@ -668,17 +668,17 @@ Use `admin` user with password `admin` to login to the dashboards.
         bind *:80
         default_backend servers
         unique-id-format %{+X}o\ %ci:%cp_%fi:%fp_%Ts_%rt:%pid
-        {% if ansible_os_family != 'RedHat' %}
+      {% if ansible_os_family != 'RedHat' %}
         http-request capture req.fhdr(Host) len 128
         http-request capture req.fhdr(Referer) len 1024
         http-request capture req.fhdr(User-Agent) len 1024
         http-request capture req.fhdr(Accept) len 1024
-        {% else %}
+      {% else %}
         capture request header Host len 128
         capture request header Referer len 1024
         capture request header User-Agent len 1024
         capture request header Accept len 1024
-        {% endif %}
+      {% endif %}
         # custom log-format in JSON.
         # to create your own JSON structure:
         #
@@ -698,15 +698,15 @@ Use `admin` user with password `admin` to login to the dashboards.
         # 8.2.4. Custom log format
         # https://www.haproxy.com/documentation/hapee/latest/onepage/#8.2.4
         #
-        {% if ansible_os_family != 'RedHat' %}
+      {% if ansible_os_family != 'RedHat' %}
         log-format '{"bytes_read":%B,"hostname":"%H","http":{"method":"%HM","uri":"%HP","query":"%HQ","version":"%HV"},"unique-id":"%ID","status_code":%ST,"gmt_date_time":"%T","timestamp":%Ts,"bytes_uploaded":%U,"backend_name":"%b","beconn":%bc,"backend_queue":%bq,"client_ip":"%ci","client_port":%cp,"frontend_name":"%f","frontend_ip":"%fi","frontend_port":%fp,"ssl":{"ciphers":"%sslc","version":"%sslv"},"request":{"headers":{"host":"%[capture.req.hdr(0),json(utf8ps)]","referer":"%[capture.req.hdr(1),json(utf8ps)]","ua":"%[capture.req.hdr(2),json(utf8ps)]","accept":"%[capture.req.hdr(3),json(utf8ps)]"}}}'
-        {% else %}
+      {% else %}
         # XXX haproxy for CentOS is 1.x. that version does not understand
         # HM, `http-request capture`, and others. use simplified version of
         # JSON log. log-format of 1.x does not understand single quotes.
         # spaces must be escaped.
         log-format {"bytes_read":%B,"hostname":"%H","unique-id":"%ID","status_code":%ST,"gmt_date_time":"%T","timestamp":%Ts,"bytes_uploaded":%U,"backend_name":"%b","beconn":%bc,"backend_queue":%bq,"client_ip":"%ci","client_port":%cp,"frontend_name":"%f","frontend_ip":"%fi","frontend_port":%fp,"ssl":{"ciphers":"%sslc","version":"%sslv"},"request":{"headers":"%hr"}}
-        {% endif %}
+      {% endif %}
 
       backend servers
         option forwardfor
