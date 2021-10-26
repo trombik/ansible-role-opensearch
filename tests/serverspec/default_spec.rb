@@ -337,9 +337,6 @@ describe "Log" do
     it { should exist }
     it { should be_file }
     # test if logs from haproxy are correctly parsed by fluentd
-    its(:content) do
-      pending "logs from haproxy itself are not yet handled by fluentd"
-      should_not match(/Fluent::Plugin::Parser::ParserError error="pattern not matched with data/)
-    end
+    its(:content) { should_not match(/Fluent::Plugin::Parser::ParserError error="pattern not matched with data/) }
   end
 end

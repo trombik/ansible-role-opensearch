@@ -260,8 +260,6 @@ An example to install:
 * `haproxy`
 * `fluentd`
 
-The example does not work on `CentOS` yet.
-
 `haproxy` is a reverse proxy for `opensearch-dashboards`. Logs from `haproxy`
 are sent to a local `fluentd` `syslog` listener. The `fluentd` then processes
 the logs, and sends them to `opensearch`. The index pattern is `logstash-*`.
@@ -290,23 +288,6 @@ Use `admin` user with password `admin` to login to the dashboards.
         protocol: tcp
         jump: ACCEPT
       when: ansible_os_family == 'RedHat'
-    - name: Accept UDP syslog and forward to fluentd
-      ansible.builtin.copy:
-        content: |
-          $ModLoad imudp
-          $UDPServerRun 514
-          local2.* @127.0.01:5140
-        dest: /etc/rsyslog.d/haproxy.conf
-        mode: "0644"
-      register: __register_rsyslog_centos
-      when: ansible_os_family == 'RedHat'
-    - name: Restart rsyslog
-      ansible.builtin.service:
-        name: rsyslog
-        state: restarted
-      when:
-        - ansible_os_family == 'RedHat'
-        - __register_rsyslog_centos['changed']
   roles:
     - role: trombik.freebsd_pkg_repo
       when: ansible_os_family == "FreeBSD"
@@ -617,12 +598,14 @@ Use `admin` user with password `admin` to login to the dashboards.
     haproxy_config: |
       global
         daemon
+        {% if ansible_os_family != 'RedHat' %}
         # increase default 1024  maximum line length to 65535. it truncates
         # logs when longer than this value.
-        {% if ansible_os_family == 'RedHat' %}
-        log 127.0.0.1:514 local2
-        {% else %}
         log 127.0.0.1:5140 len 65535 format rfc3164 local0 info
+        {% else %}
+        # XXX haproxy 1.x does not understand `format`.
+        log 127.0.0.1:5140 len 65535 local2
+        log-send-hostname
         {% endif %}
 
 
@@ -690,6 +673,11 @@ Use `admin` user with password `admin` to login to the dashboards.
         http-request capture req.fhdr(Referer) len 1024
         http-request capture req.fhdr(User-Agent) len 1024
         http-request capture req.fhdr(Accept) len 1024
+        {% else %}
+        capture request header Host len 128
+        capture request header Referer len 1024
+        capture request header User-Agent len 1024
+        capture request header Accept len 1024
         {% endif %}
         # custom log-format in JSON.
         # to create your own JSON structure:
@@ -697,16 +685,27 @@ Use `admin` user with password `admin` to login to the dashboards.
         # cd files/test/haproxy
         # ruby ./yaml2logformat.rb log.yml
         #
+        # note that the output includes single quoted log format. however,
+        # the single quotes must be removed when haproxy version is 1.x.
+        # for example, when the output is:
+        #
+        # log-format '{"bytes_read":%B}'
+        #
+        # use this instead:
+        # log-format {"bytes_read":%B}
+        #
         # see available variables at:
         # 8.2.4. Custom log format
         # https://www.haproxy.com/documentation/hapee/latest/onepage/#8.2.4
         #
-        {% if ansible_os_family == 'RedHat' %}
-        # XXX haproxy for CentOS is 1.x. that version does not understand
-        # `http-request capture`. use simplified version of JSON log.
-        log-format '{"bytes_read":%B,"hostname":"%H","http":{"method":"%HM","uri":"%HP","query":"%HQ","version":"%HV"},"unique-id":"%ID","status_code":%ST,"gmt_date_time":"%T","timestamp":%Ts,"bytes_uploaded":%U,"backend_name":"%b","beconn":%bc,"backend_queue":%bq,"client_ip":"%ci","client_port":%cp,"frontend_name":"%f","frontend_ip":"%fi","frontend_port":%fp,"ssl":{"ciphers":"%sslc","version":"%sslv"}}'
-        {% else %}
+        {% if ansible_os_family != 'RedHat' %}
         log-format '{"bytes_read":%B,"hostname":"%H","http":{"method":"%HM","uri":"%HP","query":"%HQ","version":"%HV"},"unique-id":"%ID","status_code":%ST,"gmt_date_time":"%T","timestamp":%Ts,"bytes_uploaded":%U,"backend_name":"%b","beconn":%bc,"backend_queue":%bq,"client_ip":"%ci","client_port":%cp,"frontend_name":"%f","frontend_ip":"%fi","frontend_port":%fp,"ssl":{"ciphers":"%sslc","version":"%sslv"},"request":{"headers":{"host":"%[capture.req.hdr(0),json(utf8ps)]","referer":"%[capture.req.hdr(1),json(utf8ps)]","ua":"%[capture.req.hdr(2),json(utf8ps)]","accept":"%[capture.req.hdr(3),json(utf8ps)]"}}}'
+        {% else %}
+        # XXX haproxy for CentOS is 1.x. that version does not understand
+        # HM, `http-request capture`, and others. use simplified version of
+        # JSON log. log-format of 1.x does not understand single quotes.
+        # spaces must be escaped.
+        log-format {"bytes_read":%B,"hostname":"%H","unique-id":"%ID","status_code":%ST,"gmt_date_time":"%T","timestamp":%Ts,"bytes_uploaded":%U,"backend_name":"%b","beconn":%bc,"backend_queue":%bq,"client_ip":"%ci","client_port":%cp,"frontend_name":"%f","frontend_ip":"%fi","frontend_port":%fp,"ssl":{"ciphers":"%sslc","version":"%sslv"},"request":{"headers":"%hr"}}
         {% endif %}
 
       backend servers
@@ -738,11 +737,18 @@ Use `admin` user with password `admin` to login to the dashboards.
             port 5140
             bind 127.0.0.1
             tag haproxy
+            # include severity in the syslog event.
+            # by default, syslog input plugin does not include severity.
+            severity_key severity
             <parse>
               message_format rfc3164
             </parse>
           </source>
-          <filter haproxy.**>
+
+          # process access log from haproxy. info level includes access logs.
+          # key `message` includes escaped JSON. as the JSON include all data,
+          # discard other data in the fluentd event with `reserve_data false`.
+          <filter haproxy.*.info>
             @type parser
             <parse>
               @type json
@@ -755,20 +761,25 @@ Use `admin` user with password `admin` to login to the dashboards.
             reserve_data false
             replace_invalid_sequence true
           </filter>
+
+          # send events to elasticsearch. note that events are sent with
+          # `_bulk` API. it takes some time for events to be sent.
           <match haproxy.**>
             @type elasticsearch
-            # do not use 127.0.0.1 here. use CN in the cert
+            # do not use 127.0.0.1 here. use CN in the certificate
             host localhost
             port 9200
             scheme https
             ssl_version TLSv1_2
             user "logstash"
             password "logstash"
+            # enable debug log in transporter. events sent to elasticsearch
+            # are logged in the log file. you probably want to set this to
+            # false in production.
             with_transporter_log true
             ca_file {{ opensearch_conf_dir }}/root-ca.pem
             ssl_verify true
             logstash_format true
-
             # XXX a workaround to use opensearch with elasticsearch output
             # plugin. see also fluentd_gems below.
             #
@@ -776,8 +787,6 @@ Use `admin` user with password `admin` to login to the dashboards.
             verify_es_version_at_startup false
             default_elasticsearch_version 7
 
-            # for debug
-            with_transporter_log true
             <buffer>
               timekey 1d
               timekey_use_utc true

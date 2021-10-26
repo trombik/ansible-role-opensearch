@@ -1,0 +1,57 @@
+---
+bytes_read:
+  type: numeric
+  name: "%B"
+hostname:
+  type: string
+  name: "%H"
+unique-id:
+  type: string
+  name: "%ID"
+status_code:
+  type: numeric
+  name: "%ST"
+gmt_date_time:
+  type: date
+  name: "%T"
+timestamp:
+  type: numeric
+  name: "%Ts"
+bytes_uploaded:
+  type: numeric
+  name: "%U"
+backend_name:
+  type: string
+  name: "%b"
+beconn:
+  type: numeric
+  name: "%bc"
+backend_queue:
+  type: numeric
+  name: "%bq"
+client_ip:
+  type: IP
+  name: "%ci"
+client_port:
+  type: numeric
+  name: "%cp"
+frontend_name:
+  type: string
+  name: "%f"
+frontend_ip:
+  type: IP
+  name: "%fi"
+frontend_port:
+  type: numeric
+  name: "%fp"
+ssl:
+  ciphers:
+    type: string
+    name: "%sslc"
+  version:
+    type: string
+    name: "%sslv"
+request:
+  headers:
+    type: string
+    name: "%hr"
