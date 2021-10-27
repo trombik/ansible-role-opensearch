@@ -1,3 +1,8 @@
+## Release 2.0.0
+
+The initial release as `trombik.opensearch`. This role is the successor of
+`trombik.opendistroforelasticsearch`.
+
 ## Release 1.1.4
 
 * 7526ba8 bugfix: add release GitHub Actions workflow
