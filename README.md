@@ -261,8 +261,9 @@ An example to install:
 * `fluentd`
 
 `haproxy` is a reverse proxy for `opensearch-dashboards`. Logs from `haproxy`
-are sent to a local `fluentd` `syslog` listener. The `fluentd` then processes
-the logs, and sends them to `opensearch`. The index pattern is `logstash-*`.
+and `syslog` daemon are sent to a local `fluentd` `syslog` listener. The
+`fluentd` then processes the logs, and sends them to `opensearch`. The index
+pattern is `logstash-*`.
 
 Note that the `fluentd` `elasticsearch` output plugin does not support
 `opensearch`. The example workarounds the issue by:
