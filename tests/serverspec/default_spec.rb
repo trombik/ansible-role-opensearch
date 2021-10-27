@@ -65,7 +65,8 @@ ports = [
   9300, # opensearch cluster
   80,   # haproxy
   5601, # opensearch dashbords
-  5140, # fluentd
+  5140, # fluentd, from haproxy
+  1514, # fluentd, from syslogd
 ]
 
 case os[:family]
@@ -338,5 +339,16 @@ describe "Log" do
     it { should be_file }
     # test if logs from haproxy are correctly parsed by fluentd
     its(:content) { should_not match(/Fluent::Plugin::Parser::ParserError error="pattern not matched with data/) }
+  end
+end
+
+case os[:family]
+when "ubuntu", "redhat"
+  describe service "rsyslog" do
+    it { should be_running }
+  end
+when "freebsd"
+  describe service "syslogd" do
+    it { should be_running }
   end
 end

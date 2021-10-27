@@ -8,6 +8,56 @@
         protocol: tcp
         jump: ACCEPT
       when: ansible_os_family == 'RedHat'
+
+    - name: Enable syslog forwarding from rsyslog
+      ansible.builtin.copy:
+        dest: /etc/rsyslog.d/fluentd.conf
+        content: |
+          *.*;syslog;auth,authpriv.none action(
+            Target="127.0.0.1"
+            type="omfwd"
+            Port="1514"
+            Protocol="udp"
+            template="RSYSLOG_SyslogProtocol23Format"
+          )
+        mode: "0644"
+      when:
+        - ansible_os_family == 'Debian' or ansible_os_family == 'RedHat'
+      register: __register_project_rsyslog_config
+
+    - name: Restart rsyslog
+      ansible.builtin.service:
+        name: rsyslog
+        state: restarted
+      when:
+        - ansible_os_family == 'Debian' or ansible_os_family == 'RedHat'
+        - __register_project_rsyslog_config['changed']
+
+    - name: Enable syslog forwarding from syslogd
+      ansible.builtin.copy:
+        dest: /etc/syslog.d/fluentd.conf
+        content: |
+          *.*						@127.0.0.1:1514
+        mode: "0644"
+      when: ansible_os_family == 'FreeBSD'
+      register: __register_project_syslog_config
+
+    - name: Enable syslog rfc5424
+      ansible.builtin.copy:
+        dest: /etc/rc.conf.d/syslogd
+        content: |
+          syslogd_flags="-s -O rfc5424"
+        mode: "0644"
+      when: ansible_os_family == 'FreeBSD'
+      register: __register_project_syslog_flags
+
+    - name: Restart syslogd
+      ansible.builtin.service:
+        name: syslogd
+        state: restarted
+      when:
+        - ansible_os_family == 'FreeBSD'
+        - __register_project_syslog_config['changed'] or __register_project_syslog_flags['changed']
   roles:
     - role: trombik.freebsd_pkg_repo
       when: ansible_os_family == "FreeBSD"
@@ -449,6 +499,46 @@
       log_level debug
       suppress_config_dump
     fluentd_configs:
+      listen_on_1514:
+        enabled: yes
+        config: |
+          <source>
+            @type syslog
+            port 1514
+            bind 127.0.0.1
+            tag syslog
+            severity_key severity
+            <parse>
+              message_format rfc5424
+              with_priority true
+            </parse>
+          </source>
+          <match syslog.**>
+            @type elasticsearch
+            host localhost
+            port 9200
+            scheme https
+            ssl_version TLSv1_2
+            user "logstash"
+            password "logstash"
+            with_transporter_log true
+            ca_file {{ opensearch_conf_dir }}/root-ca.pem
+            ssl_verify true
+            # XXX you need to create a role to send data to index other than
+            # `logstash`, because `logstash` role, which is a static,
+            # pre-installed role, has only access to `logstash-*` index
+            # patterns.
+            # logstash_prefix syslog
+            logstash_format true
+            verify_es_version_at_startup false
+            default_elasticsearch_version 7
+
+            <buffer>
+              timekey 1d
+              timekey_use_utc true
+              timekey_wait 10m
+            </buffer>
+          </match>
       listen_on_5140:
         enabled: true
         config: |
