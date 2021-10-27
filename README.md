@@ -289,6 +289,56 @@ Use `admin` user with password `admin` to login to the dashboards.
         protocol: tcp
         jump: ACCEPT
       when: ansible_os_family == 'RedHat'
+
+    - name: Enable syslog forwarding from rsyslog
+      ansible.builtin.copy:
+        dest: /etc/rsyslog.d/fluentd.conf
+        content: |
+          *.*;syslog;auth,authpriv.none action(
+            Target="127.0.0.1"
+            type="omfwd"
+            Port="1514"
+            Protocol="udp"
+            template="RSYSLOG_SyslogProtocol23Format"
+          )
+        mode: "0644"
+      when:
+        - ansible_os_family == 'Debian' or ansible_os_family == 'RedHat'
+      register: __register_project_rsyslog_config
+
+    - name: Restart rsyslog
+      ansible.builtin.service:
+        name: rsyslog
+        state: restarted
+      when:
+        - ansible_os_family == 'Debian' or ansible_os_family == 'RedHat'
+        - __register_project_rsyslog_config['changed']
+
+    - name: Enable syslog forwarding from syslogd
+      ansible.builtin.copy:
+        dest: /etc/syslog.d/fluentd.conf
+        content: |
+          *.*						@127.0.0.1:1514
+        mode: "0644"
+      when: ansible_os_family == 'FreeBSD'
+      register: __register_project_syslog_config
+
+    - name: Enable syslog rfc5424
+      ansible.builtin.copy:
+        dest: /etc/rc.conf.d/syslogd
+        content: |
+          syslogd_flags="-s -O rfc5424"
+        mode: "0644"
+      when: ansible_os_family == 'FreeBSD'
+      register: __register_project_syslog_flags
+
+    - name: Restart syslogd
+      ansible.builtin.service:
+        name: syslogd
+        state: restarted
+      when:
+        - ansible_os_family == 'FreeBSD'
+        - __register_project_syslog_config['changed'] or __register_project_syslog_flags['changed']
   roles:
     - role: trombik.freebsd_pkg_repo
       when: ansible_os_family == "FreeBSD"
@@ -730,16 +780,33 @@ Use `admin` user with password `admin` to login to the dashboards.
       log_level debug
       suppress_config_dump
     fluentd_configs:
-      listen_on_5140:
+      input_udp_1514:
+        enabled: yes
+        config: |
+          <source>
+            @type syslog
+            @label @forward
+            port 1514
+            bind 127.0.0.1
+            tag syslog
+            # include severity in the syslog event.
+            # by default, syslog input plugin does not include severity.
+            severity_key severity
+            <parse>
+              message_format rfc5424
+              with_priority true
+            </parse>
+          </source>
+
+      input_udp_5140:
         enabled: true
         config: |
           <source>
             @type syslog
+            @label @haproxy
             port 5140
             bind 127.0.0.1
             tag haproxy
-            # include severity in the syslog event.
-            # by default, syslog input plugin does not include severity.
             severity_key severity
             <parse>
               message_format rfc3164
@@ -749,51 +816,68 @@ Use `admin` user with password `admin` to login to the dashboards.
           # process access log from haproxy. info level includes access logs.
           # key `message` includes escaped JSON. as the JSON include all data,
           # discard other data in the fluentd event with `reserve_data false`.
-          <filter haproxy.*.info>
-            @type parser
-            <parse>
-              @type json
-              json_parser json
-              time_type string
-              time_key gmt_date_time
-              time_format %d/%b/%Y:%H:%M:%S %z
-            </parse>
-            key_name message
-            reserve_data false
-            replace_invalid_sequence true
-          </filter>
+          <label @haproxy>
+            <filter *.*.info>
+              @type parser
+              <parse>
+                @type json
+                json_parser json
+                time_type string
+                time_key gmt_date_time
+                time_format %d/%b/%Y:%H:%M:%S %z
+              </parse>
+              key_name message
+              reserve_data false
+              replace_invalid_sequence true
+            </filter>
+            <match **>
+              @type relabel
+              @label @forward
+            </match>
+          </label>
 
+      outout_default:
+        enabled: yes
+        config: |
           # send events to elasticsearch. note that events are sent with
           # `_bulk` API. it takes some time for events to be sent.
-          <match haproxy.**>
-            @type elasticsearch
-            # do not use 127.0.0.1 here. use CN in the certificate
-            host localhost
-            port 9200
-            scheme https
-            ssl_version TLSv1_2
-            user "logstash"
-            password "logstash"
-            # enable debug log in transporter. events sent to elasticsearch
-            # are logged in the log file. you probably want to set this to
-            # false in production.
-            with_transporter_log true
-            ca_file {{ opensearch_conf_dir }}/root-ca.pem
-            ssl_verify true
-            logstash_format true
-            # XXX a workaround to use opensearch with elasticsearch output
-            # plugin. see also fluentd_gems below.
-            #
-            # https://github.com/uken/fluent-plugin-elasticsearch/issues/915
-            verify_es_version_at_startup false
-            default_elasticsearch_version 7
+          <label @forward>
+            <match **>
+              @type elasticsearch
+              # do not use 127.0.0.1 here. use CN in the certificate
+              host localhost
+              port 9200
+              scheme https
+              ssl_version TLSv1_2
+              user "logstash"
+              password "logstash"
+              # XXX you need to create a role to send data to index other than
+              # `logstash`, because `logstash` role, which is a static,
+              # pre-installed role, has only access to `logstash-*` index
+              # patterns.
+              # logstash_prefix syslog
 
-            <buffer>
-              timekey 1d
-              timekey_use_utc true
-              timekey_wait 10m
-            </buffer>
-          </match>
+              # enable debug log in transporter. events sent to elasticsearch
+              # are logged in the log file. you probably want to set this to
+              # false in production.
+              with_transporter_log true
+              ca_file {{ opensearch_conf_dir }}/root-ca.pem
+              ssl_verify true
+              logstash_format true
+              # XXX a workaround to use opensearch with elasticsearch output
+              # plugin. see also fluentd_gems below.
+              #
+              # https://github.com/uken/fluent-plugin-elasticsearch/issues/915
+              verify_es_version_at_startup false
+              default_elasticsearch_version 7
+
+              <buffer>
+                timekey 1d
+                timekey_use_utc true
+                timekey_wait 10m
+              </buffer>
+            </match>
+          </label>
     fluentd_gems:
       - name: elasticsearch-transport
         version: 7.13.3
