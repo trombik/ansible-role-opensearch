@@ -1,0 +1,782 @@
+---
+- hosts: localhost
+  pre_tasks:
+    - name: Enable syslog forwarding from syslogd
+      ansible.builtin.copy:
+        dest: /etc/syslog.d/fluentd.conf
+        content: |
+          *.*						@{{ project_master_ip_address }}:1514
+        mode: "0644"
+      register: __register_project_syslog_config
+
+    - name: Enable syslog rfc5424
+      ansible.builtin.copy:
+        dest: /etc/rc.conf.d/syslogd
+        content: |
+          syslogd_flags="-s -O rfc5424"
+        mode: "0644"
+      register: __register_project_syslog_flags
+
+    - name: Restart syslogd
+      ansible.builtin.service:
+        name: syslogd
+        state: restarted
+      when:
+        - __register_project_syslog_config['changed'] or __register_project_syslog_flags['changed']
+  roles:
+    - role: trombik.freebsd_pkg_repo
+    - role: trombik.java
+    - role: trombik.sysctl
+    - role: trombik.cfssl
+      when:
+        - ansible_hostname == project_master_hostname
+    - role: ansible-role-opensearch
+    - role: trombik.opensearch_dashboards
+      when:
+        - ansible_hostname == project_master_hostname
+    - role: trombik.fluentd
+      when:
+        - ansible_hostname == project_master_hostname
+    - role: trombik.haproxy
+      when:
+        - ansible_hostname == project_master_hostname
+  vars:
+    # An example to create a cluster of opensearch
+    #
+    # Nodes:
+    #
+    # * one master-only node
+    # * two master-eligible data nodes
+    # * one coordinating node
+    #
+    # TLS is used in:
+    #
+    # * opensearch transport between opensearch cluster
+    # * API endpoint
+    # * opensearch API
+    #
+    # TLS is NOT used in:
+    #
+    # * reverse proxy for opensearch-dashboards
+    #
+    # the certificates are automatically generated and signed with cfssl API.
+    # the certificates use IPv4 address as its name, not hostname
+    #
+    # the master-only nodes also provides:
+    #
+    # * cfsssl APIs for certificate services
+    # * reverse proxy for opensearch-dashboards
+    # * opensearch-dashboards
+    # * fluentd syslog listeners
+    #
+    # all nodes forward syslog messages to fluentd. the syslog listener forwards
+    # messages to opensearch. another syslog listener accepts logs from
+    # haproxy.
+    #
+    # How to test the cluster:
+    #
+    # as `test-kitchen` does not support multi-nodes, each nodes has an extra
+    # private network interface for cluster communication. the subnet is
+    # 172.16.1.0/24.
+    #
+    # `kitchen test` does not work because each node requires others for the
+    # test. instead, run:
+    #
+    # kitchen converge cluster
+    # kitchen verify cluster
+    #
+    project_master_ip_address: 172.16.1.100
+    project_master_hostname: cluster-cluster-m
+    project_external_ip_address: "{{ ansible_all_ipv4_addresses[1] }}"
+    # XXX use my own package as the package in the official package tree is
+    # broken. note that the package depends on node10, which is EoLed and has
+    # vulnerabilities.
+    freebsd_pkg_repo:
+      local:
+        enabled: "true"
+        url: "http://pkg.i.trombik.org/{{ ansible_distribution_version | regex_replace('\\.') }}{{ ansible_architecture }}-default-default"
+        mirror_type: none
+        priority: 100
+        state: present
+    os_opensearch_extra_packages:
+      FreeBSD: []
+      Debian:
+        - unzip
+      RedHat: []
+    opensearch_extra_packages: "{{ os_opensearch_extra_packages[ansible_os_family] }}"
+    os_java_packages:
+      FreeBSD:
+        - openjdk11
+        - jq
+        - vim
+        - tmux
+        - p5-ack
+      Debian:
+        - openjdk-11-jdk
+      RedHat:
+        - java-11-openjdk-devel
+    java_packages: "{{ os_java_packages[ansible_os_family] }}"
+    os_sysctl:
+      FreeBSD:
+        kern.maxfilesperproc: 65536
+        security.bsd.unprivileged_mlock: 1
+      Debian:
+        # see https://opensearch.org/docs/latest/opensearch/install/important-settings/
+        vm.max_map_count: 262144
+      RedHat:
+        vm.max_map_count: 262144
+    sysctl: "{{ os_sysctl[ansible_os_family] }}"
+
+    host_opensearch_wait_for_cluster_status:
+      cluster-cluster-m: no
+      cluster-cluster-d1: no
+      cluster-cluster-d2: no
+      cluster-cluster-c1: yellow
+    opensearch_wait_for_cluster_status: "{{ host_opensearch_wait_for_cluster_status[ansible_hostname] }}"
+    os_opensearch_package:
+      FreeBSD: "{{ __opensearch_package }}"
+      Debian: "{{ __opensearch_package }}"
+      RedHat: opensearch-1.13.2
+    opensearch_package: "{{ os_opensearch_package[ansible_os_family] }}"
+    os_opensearch_flags:
+      FreeBSD: ""
+      Debian: |
+        ES_PATH_CONF={{ opensearch_conf_dir }}
+        ES_STARTUP_SLEEP_TIME=5
+      RedHat: |
+        ES_PATH_CONF={{ opensearch_conf_dir }}
+        ES_STARTUP_SLEEP_TIME=5
+    opensearch_flags: "{{ os_opensearch_flags[ansible_os_family] }}"
+    os_opensearch_jvm_options:
+      FreeBSD: ""
+      Debian: |
+        # see opensearch-tar-install.sh
+        # /usr/bin/getconf CLK_TCK`
+        -Dclk.tck=100
+        -Djdk.attach.allowAttachSelf=true
+        -Djava.security.policy={{ opensearch_root_dir }}/plugins/opensearch-performance-analyzer/pa_config/opensearch_security.policy
+      RedHat: |
+        # /usr/bin/getconf CLK_TCK`
+        -Dclk.tck=100
+        -Djdk.attach.allowAttachSelf=true
+        -Djava.security.policy={{ opensearch_root_dir }}/plugins/opensearch-performance-analyzer/pa_config/opensearch_security.policy
+
+    os_opensearch_http_auth:
+      FreeBSD:
+        url_username: admin
+        url_password: admin
+        ca_path: "{{ opensearch_conf_dir }}/root.pem"
+        validate_certs: yes
+    opensearch_http_auth: "{{ os_opensearch_http_auth[ansible_os_family] }}"
+    opensearch_jvm_options: "{{ lookup('file', 'test/jvm_options') + os_opensearch_jvm_options[ansible_os_family] }}"
+
+    hostname_project_node_master:
+      cluster-cluster-m: true
+      cluster-cluster-d1: true
+      cluster-cluster-d2: true
+      cluster-cluster-c1: false
+    project_node_master: "{{ hostname_project_node_master[ansible_hostname] }}"
+
+    hostname_project_node_data:
+      cluster-cluster-m: false
+      cluster-cluster-d1: true
+      cluster-cluster-d2: true
+      cluster-cluster-c1: false
+      cluster-c1: false
+    project_node_data: "{{ hostname_project_node_data[ansible_hostname] }}"
+
+    hostname_project_node_ingest:
+      cluster-cluster-m: false
+      cluster-cluster-d1: true
+      cluster-cluster-d2: true
+      cluster-cluster-c1: false
+    project_node_ingest: "{{ hostname_project_node_ingest[ansible_hostname] }}"
+
+    hostname_project_cluster_initial_master_nodes:
+      cluster-cluster-m:
+        - 172.16.1.100
+      cluster-cluster-d1:
+        - 172.16.1.100
+      cluster-cluster-d2:
+        - 172.16.1.100
+      cluster-cluster-c1: []
+    project_cluster_initial_master_nodes: "{{ hostname_project_cluster_initial_master_nodes[ansible_hostname] }}"
+
+    opensearch_config:
+      node.master: "{{ project_node_master }}"
+      node.data: "{{ project_node_data }}"
+      node.ingest: "{{ project_node_ingest }}"
+      discovery.seed_hosts:
+        - 172.16.1.100
+        - 172.16.1.101
+        - 172.16.1.102
+      network.publish_host:
+        - "{{ project_external_ip_address }}"
+      path.data: "{{ opensearch_db_dir }}"
+      http.port: "{{ opensearch_http_port }}"
+      path.logs: "{{ opensearch_log_dir }}"
+      http.compression: "true"
+      network.host:
+        - "{{ opensearch_http_host }}"
+        - _site_
+      cluster.name: test-cluster
+      cluster.initial_master_nodes: "{{ project_cluster_initial_master_nodes }}"
+      node.name: "{{ ansible_em1['ipv4'][0]['address'] }}"
+      http.cors.enabled: "true"
+      http.cors.allow-origin: "*"
+      http.cors.max-age: 86400
+      http.cors.allow-methods: "OPTIONS, HEAD, GET, POST, PUT, DELETE"
+      http.cors.allow-headers: "X-Requested-With, Content-Type, Content-Length"
+      http.cors.allow-credentials: "true"
+      # _________________________TLS
+      plugins.security.ssl.transport.pemcert_filepath: localhost.pem
+      plugins.security.ssl.transport.pemkey_filepath: localhost.pkcs8
+      plugins.security.ssl.transport.pemtrustedcas_filepath: root.pem
+      plugins.security.ssl.transport.enforce_hostname_verification: true
+      plugins.security.ssl.http.enabled: true
+      plugins.security.ssl.http.pemcert_filepath: localhost.pem
+      plugins.security.ssl.http.pemkey_filepath: localhost.pkcs8
+      plugins.security.ssl.http.pemtrustedcas_filepath: root.pem
+      plugins.security.allow_unsafe_democertificates: false
+      plugins.security.allow_default_init_securityindex: true
+      plugins.security.authcz.admin_dn:
+        - CN=Admin,O=example.com,L=San Francisco,ST=California,C=US
+      # Subject: C = US, ST = California, L = San Francisco, O = example.com, CN = 172.16.1.101
+      plugins.security.nodes_dn:
+        - CN=cluster-cluster-m,O=example.com,L=San Francisco,ST=California,C=US
+        - CN=cluster-cluster-d1,O=example.com,L=San Francisco,ST=California,C=US
+        - CN=cluster-cluster-d2,O=example.com,L=San Francisco,ST=California,C=US
+        - CN=cluster-cluster-c1,O=example.com,L=San Francisco,ST=California,C=US
+      plugins.security.advanced_modules_enabled: false
+      plugins.security.audit.type: internal_opensearch
+      plugins.security.enable_snapshot_restore_privilege: true
+      plugins.security.check_snapshot_restore_write_privileges: true
+      plugins.security.restapi.roles_enabled: ["all_access", "security_rest_api_access"]
+      plugins.security.system_indices.enabled: true
+      plugins.security.system_indices.indices: [".opendistro-alerting-config", ".opendistro-alerting-alert*", ".opendistro-anomaly-results*", ".opendistro-anomaly-detector*", ".opendistro-anomaly-checkpoints", ".opendistro-anomaly-detection-state", ".opendistro-reports-*", ".opendistro-notifications-*", ".opendistro-notebooks", ".opendistro-asynchronous-search-response*"]
+
+      plugins.security.disabled: false
+      cluster.routing.allocation.disk.threshold_enabled: false
+
+    project_security_plugin_dir: "{{ opensearch_plugins_dir }}/opensearch-security"
+    project_securityadmin_bin: "{{ project_security_plugin_dir }}/tools/securityadmin.sh"
+    project_security_plugin_post_command:
+      cmd: "{{ project_securityadmin_bin }} -icl -cacert {{ opensearch_conf_dir }}/root.pem -cert {{ opensearch_conf_dir }}/Admin.pem -key {{ opensearch_conf_dir }}/Admin.pkcs8 -h 172.16.1.200"
+      args:
+        chdir: "{{ project_security_plugin_dir }}/securityconfig"
+      enabled: "{% if ansible_hostname == 'cluster-cluster-c1' %}yes{% else %}no{% endif %}"
+
+    opensearch_plugins: []
+    opensearch_extra_plugin_files:
+      - path: opensearch-security/securityconfig/action_groups.yml
+        type: yaml
+        mode: "0640"
+        group: "{{ opensearch_user }}"
+        content: "{{ lookup('file', 'test/securityconfig/action_groups.yml') | from_yaml }}"
+        post_command: "{{ project_security_plugin_post_command }}"
+      - path: opensearch-security/securityconfig/audit.yml
+        type: yaml
+        mode: "0640"
+        group: "{{ opensearch_user }}"
+        content: "{{ lookup('file', 'test/securityconfig/audit.yml') | from_yaml }}"
+        post_command: "{{ project_security_plugin_post_command }}"
+      - path: opensearch-security/securityconfig/config.yml
+        type: yaml
+        mode: "0640"
+        group: "{{ opensearch_user }}"
+        content: "{{ lookup('file', 'test/securityconfig/config.yml') | from_yaml }}"
+        post_command: "{{ project_security_plugin_post_command }}"
+      - path: opensearch-security/securityconfig/internal_users.yml
+        type: yaml
+        mode: "0640"
+        group: "{{ opensearch_user }}"
+        content: "{{ lookup('file', 'test/securityconfig/internal_users.yml') | from_yaml }}"
+        post_command: "{{ project_security_plugin_post_command }}"
+      - path: opensearch-security/securityconfig/nodes_dn.yml
+        type: yaml
+        mode: "0640"
+        group: "{{ opensearch_user }}"
+        content: "{{ lookup('file', 'test/securityconfig/nodes_dn.yml') | from_yaml }}"
+        post_command: "{{ project_security_plugin_post_command }}"
+      - path: opensearch-security/securityconfig/roles.yml
+        type: yaml
+        mode: "0640"
+        group: "{{ opensearch_user }}"
+        content: "{{ lookup('file', 'test/securityconfig/roles.yml') | from_yaml }}"
+        post_command: "{{ project_security_plugin_post_command }}"
+      - path: opensearch-security/securityconfig/roles_mapping.yml
+        type: yaml
+        mode: "0640"
+        group: "{{ opensearch_user }}"
+        content: "{{ lookup('file', 'test/securityconfig/roles_mapping.yml') | from_yaml }}"
+        post_command: "{{ project_security_plugin_post_command }}"
+      - path: opensearch-security/securityconfig/tenants.yml
+        type: yaml
+        mode: "0640"
+        group: "{{ opensearch_user }}"
+        content: "{{ lookup('file', 'test/securityconfig/tenants.yml') | from_yaml }}"
+        post_command: "{{ project_security_plugin_post_command }}"
+      - path: opensearch-security/securityconfig/whitelist.yml
+        type: yaml
+        mode: "0640"
+        group: "{{ opensearch_user }}"
+        content: "{{ lookup('file', 'test/securityconfig/whitelist.yml') | from_yaml }}"
+        post_command: "{{ project_security_plugin_post_command }}"
+
+    opensearch_config_log4j2_properties: "{{ lookup('file', 'test/log4j2_properties') }}"
+
+    # _____________________________________________opensearch-dashboards
+    opensearch_dashboards_config:
+      server.host: 127.0.0.1
+      server.port: "{{ opensearch_dashboards_bind_port }}"
+      server.name: "OpenSearch Dashboards"
+      # XXX fix the path to log in the FreeBSD package
+      logging.dest: "{% if ansible_os_family == 'FreeBSD' %}/var/log/opensearch_dashboards.log{% else %}{{ opensearch_dashboards_log_file }}{% endif %}"
+      logging.verbose: true
+      opensearch.hosts: ["https://localhost:9200"]
+      path.data: "{{ opensearch_dashboards_data_dir }}"
+      opensearch.ssl.verificationMode: none
+      opensearch.username: "kibanaserver"
+      opensearch.password: "kibanaserver"
+      opensearch_security.multitenancy.enabled: true
+      opensearch_security.multitenancy.tenants.preferred: ["Private", "Global"]
+      opensearch_security.readonly_mode.roles: ["kibana_read_only"]
+      # Use this setting if you are running kibana without https
+      opensearch_security.cookie.secure: false
+    # _____________________________________________haproxy
+    project_backend_host: 172.16.1.200
+    project_backend_port: 5601
+    os_haproxy_selinux_seport:
+      FreeBSD: {}
+      Debian: {}
+      RedHat:
+        ports:
+          - 80
+          - 5601
+        proto: tcp
+        setype: http_port_t
+    haproxy_selinux_seport: "{{ os_haproxy_selinux_seport[ansible_os_family] }}"
+    haproxy_config: |
+      global
+        daemon
+      {% if ansible_os_family != 'RedHat' %}
+        # increase default 1024  maximum line length to 65535. it truncates
+        # logs when longer than this value.
+        log {{ project_master_ip_address }}:5140 len 65535 format rfc3164 local0 info
+      {% else %}
+        # XXX haproxy 1.x does not understand `format`.
+        log {{ project_master_ip_address }}:5140 len 65535 local2
+        log-send-hostname
+      {% endif %}
+
+
+      {% if ansible_os_family == 'FreeBSD' %}
+      # FreeBSD package does not provide default
+        maxconn 4096
+        user {{ haproxy_user }}
+        group {{ haproxy_group }}
+      {% elif ansible_os_family == 'Debian' %}
+        chroot {{ haproxy_chroot_dir }}
+        stats socket /run/haproxy/admin.sock mode 660 level admin expose-fd listeners
+        stats timeout 30s
+        user {{ haproxy_user }}
+        group {{ haproxy_group }}
+
+        # Default SSL material locations
+        ca-base /etc/ssl/certs
+        crt-base /etc/ssl/private
+
+        # See: https://ssl-config.mozilla.org/#server=haproxy&server-version=2.0.3&config=intermediate
+          ssl-default-bind-ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384
+          ssl-default-bind-ciphersuites TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256
+          ssl-default-bind-options ssl-min-ver TLSv1.2 no-tls-tickets
+      {% elif ansible_os_family == 'OpenBSD' %}
+        maxconn 1024
+        chroot {{ haproxy_chroot_dir }}
+        uid 604
+        gid 604
+        pidfile /var/run/haproxy.pid
+      {% elif ansible_os_family == 'RedHat' %}
+        chroot      /var/lib/haproxy
+        pidfile     /var/run/haproxy.pid
+        maxconn     4000
+        user        haproxy
+        group       haproxy
+        daemon
+      {% endif %}
+
+      defaults
+        log global
+        mode http
+        timeout connect 5s
+        timeout client 10s
+        timeout server 10s
+        retries 3
+        maxconn 2000
+      {% if ansible_os_family == 'Debian' %}
+        errorfile 400 /etc/haproxy/errors/400.http
+        errorfile 403 /etc/haproxy/errors/403.http
+        errorfile 408 /etc/haproxy/errors/408.http
+        errorfile 500 /etc/haproxy/errors/500.http
+        errorfile 502 /etc/haproxy/errors/502.http
+        errorfile 503 /etc/haproxy/errors/503.http
+        errorfile 504 /etc/haproxy/errors/504.http
+      {% elif ansible_os_family == 'OpenBSD' %}
+        option  redispatch
+      {% endif %}
+
+      frontend http-in
+        bind *:80
+        default_backend servers
+        unique-id-format %{+X}o\ %ci:%cp_%fi:%fp_%Ts_%rt:%pid
+      {% if ansible_os_family != 'RedHat' %}
+        http-request capture req.fhdr(Host) len 128
+        http-request capture req.fhdr(Referer) len 1024
+        http-request capture req.fhdr(User-Agent) len 1024
+        http-request capture req.fhdr(Accept) len 1024
+      {% else %}
+        capture request header Host len 128
+        capture request header Referer len 1024
+        capture request header User-Agent len 1024
+        capture request header Accept len 1024
+      {% endif %}
+        # custom log-format in JSON.
+        # to create your own JSON structure:
+        #
+        # cd files/test/haproxy
+        # ruby ./yaml2logformat.rb log.yml
+        #
+        # note that the output includes single quoted log format. however,
+        # the single quotes must be removed when haproxy version is 1.x.
+        # for example, when the output is:
+        #
+        # log-format '{"bytes_read":%B}'
+        #
+        # use this instead:
+        # log-format {"bytes_read":%B}
+        #
+        # see available variables at:
+        # 8.2.4. Custom log format
+        # https://www.haproxy.com/documentation/hapee/latest/onepage/#8.2.4
+        #
+      {% if ansible_os_family != 'RedHat' %}
+        log-format '{"bytes_read":%B,"hostname":"%H","http":{"method":"%HM","uri":"%HP","query":"%HQ","version":"%HV"},"unique-id":"%ID","status_code":%ST,"gmt_date_time":"%T","timestamp":%Ts,"bytes_uploaded":%U,"backend_name":"%b","beconn":%bc,"backend_queue":%bq,"client_ip":"%ci","client_port":%cp,"frontend_name":"%f","frontend_ip":"%fi","frontend_port":%fp,"ssl":{"ciphers":"%sslc","version":"%sslv"},"request":{"headers":{"host":"%[capture.req.hdr(0),json(utf8ps)]","referer":"%[capture.req.hdr(1),json(utf8ps)]","ua":"%[capture.req.hdr(2),json(utf8ps)]","accept":"%[capture.req.hdr(3),json(utf8ps)]"}}}'
+      {% else %}
+        # XXX haproxy for CentOS is 1.x. that version does not understand
+        # HM, `http-request capture`, and others. use simplified version of
+        # JSON log. log-format of 1.x does not understand single quotes.
+        # spaces must be escaped.
+        log-format {"bytes_read":%B,"hostname":"%H","unique-id":"%ID","status_code":%ST,"gmt_date_time":"%T","timestamp":%Ts,"bytes_uploaded":%U,"backend_name":"%b","beconn":%bc,"backend_queue":%bq,"client_ip":"%ci","client_port":%cp,"frontend_name":"%f","frontend_ip":"%fi","frontend_port":%fp,"ssl":{"ciphers":"%sslc","version":"%sslv"},"request":{"headers":"%hr"}}
+      {% endif %}
+
+      backend servers
+        option forwardfor
+        server server1 {{ project_backend_host }}:{{ project_backend_port }} maxconn 32 check
+
+    os_haproxy_flags:
+      FreeBSD: |
+        haproxy_config="{{ haproxy_conf_file }}"
+        #haproxy_flags="-q -f ${haproxy_config} -p ${pidfile}"
+      Debian: |
+        #CONFIG="/etc/haproxy/haproxy.cfg"
+        #EXTRAOPTS="-de -m 16"
+      OpenBSD: ""
+      RedHat: |
+        OPTIONS=""
+    haproxy_flags: "{{ os_haproxy_flags[ansible_os_family] }}"
+
+    # _____________________________________________fluentd
+    fluentd_system_config: |
+      log_level debug
+      suppress_config_dump
+    fluentd_configs:
+      input_udp_1514:
+        enabled: yes
+        config: |
+          <source>
+            @type syslog
+            @label @forward
+            port 1514
+            bind {{ project_master_ip_address }}
+            tag syslog
+            # include severity in the syslog event.
+            # by default, syslog input plugin does not include severity.
+            severity_key severity
+            <parse>
+              message_format rfc5424
+              with_priority true
+            </parse>
+          </source>
+
+      input_udp_5140:
+        enabled: true
+        config: |
+          <source>
+            @type syslog
+            @label @haproxy
+            port 5140
+            bind {{ project_master_ip_address }}
+            tag haproxy
+            severity_key severity
+            <parse>
+              message_format rfc3164
+            </parse>
+          </source>
+
+          # process access log from haproxy. info level includes access logs.
+          # key `message` includes escaped JSON. as the JSON include all data,
+          # discard other data in the fluentd event with `reserve_data false`.
+          <label @haproxy>
+            <filter *.*.info>
+              @type parser
+              <parse>
+                @type json
+                json_parser json
+                time_type string
+                time_key gmt_date_time
+                time_format %d/%b/%Y:%H:%M:%S %z
+              </parse>
+              key_name message
+              reserve_data false
+              replace_invalid_sequence true
+            </filter>
+            <match **>
+              @type relabel
+              @label @forward
+            </match>
+          </label>
+
+      outout_default:
+        enabled: yes
+        config: |
+          # send events to elasticsearch. note that events are sent with
+          # `_bulk` API. it takes some time for events to be sent.
+          <label @forward>
+            <match **>
+              @type elasticsearch
+              host 172.16.1.200
+              port 9200
+              scheme https
+              ssl_version TLSv1_2
+              user "logstash"
+              password "logstash"
+              # XXX you need to create a role to send data to index other than
+              # `logstash`, because `logstash` role, which is a static,
+              # pre-installed role, has only access to `logstash-*` index
+              # patterns.
+              # logstash_prefix syslog
+
+              # enable debug log in transporter. events sent to elasticsearch
+              # are logged in the log file. you probably want to set this to
+              # false in production.
+              with_transporter_log true
+              ca_file {{ opensearch_conf_dir }}/root-ca.pem
+              ssl_verify true
+              logstash_format true
+              # XXX a workaround to use opensearch with elasticsearch output
+              # plugin. see also fluentd_gems below.
+              #
+              # https://github.com/uken/fluent-plugin-elasticsearch/issues/915
+              verify_es_version_at_startup false
+              default_elasticsearch_version 7
+
+              <buffer>
+                timekey 1d
+                timekey_use_utc true
+                timekey_wait 10m
+              </buffer>
+            </match>
+          </label>
+    fluentd_gems:
+      - name: elasticsearch-transport
+        version: 7.13.3
+        state: present
+      - name: elasticsearch-api
+        version: 7.13.3
+        state: present
+      - name: elasticsearch
+        version: 7.13.3
+        state: present
+      - name: fluent-plugin-elasticsearch
+        version: 5.1.0
+        state: present
+
+    os_fluentd_flags:
+      FreeBSD: |
+        fluentd_flags="-p {{ fluentd_plugin_dir }} --log {{ fluentd_log_file }}"
+      Debian: |
+        TD_AGENT_LOG_FILE="{{ fluentd_log_file }}"
+        TD_AGENT_OPTIONS="-p {{ fluentd_plugin_dir }}"
+        STOPTIMEOUT=180
+      RedHat: |
+        TD_AGENT_LOG_FILE="{{ fluentd_log_file }}"
+        TD_AGENT_OPTIONS=""
+      OpenBSD: "--daemon /var/run/fluentd/fluentd.pid --config {{ fluentd_config_file }} -p {{ fluentd_plugin_dir }} --log {{ fluentd_log_file }}"
+    fluentd_flags: "{{ os_fluentd_flags[ansible_os_family] }}"
+    # "
+
+    # _____________________________________________apt
+    apt_repo_keys_to_add:
+      - https://packages.treasuredata.com/GPG-KEY-td-agent
+    apt_repo_to_add:
+      - "deb http://packages.treasuredata.com/4/ubuntu/{{ ansible_distribution_release }}/ {{ ansible_distribution_release }} contrib"
+    # _____________________________________________redhat_repo
+    redhat_repo:
+      treasuredata:
+        baseurl: http://packages.treasuredata.com/4/redhat/$releasever/$basearch
+        gpgkey: https://packages.treasuredata.com/GPG-KEY-td-agent
+
+    # _____________________________________________x509
+    opensearch_include_role_x509_certificate: yes
+    opensearch_x509_certificate_vars:
+      x509_certificate_debug_log: yes
+      x509_certificate_cfssl_info:
+        - path: "{{ opensearch_conf_dir }}/root.pem"
+          body:
+            label: primary
+            profile: default
+      x509_certificate_cfssl_scheme: http
+      x509_certificate_cfssl_host: "{{ project_master_ip_address }}"
+      x509_certificate_commands:
+        - cmd: "openssl pkcs8 -inform pem -outform pem -topk8 -nocrypt -v1 PBE-SHA1-3DES -in {{ opensearch_conf_dir }}/localhost.key -out {{ opensearch_conf_dir }}/localhost.pkcs8"
+          creates: "{{ opensearch_conf_dir }}/localhost.pkcs8"
+          owner: "{{ opensearch_user }}"
+          group: "{{ opensearch_group }}"
+          mode: "0440"
+        - cmd: "openssl pkcs8 -inform pem -outform pem -topk8 -nocrypt -v1 PBE-SHA1-3DES -in {{ opensearch_conf_dir }}/Admin.key -out {{ opensearch_conf_dir }}/Admin.pkcs8"
+          creates: "{{ opensearch_conf_dir }}/Admin.pkcs8"
+          owner: "{{ opensearch_user }}"
+          group: "{{ opensearch_group }}"
+          mode: "0440"
+      x509_certificate_cfssl_certificate_newcert:
+        - csr:
+            path: "{{ opensearch_conf_dir }}/localhost.csr"
+            owner: "{{ opensearch_user }}"
+            group: "{{ opensearch_group }}"
+            mode: "0444"
+          public:
+            path: "{{ opensearch_conf_dir }}/localhost.pem"
+            owner: "{{ opensearch_user }}"
+            group: "{{ opensearch_group }}"
+            mode: "0444"
+            notify:
+              - Restart haproxy
+          private:
+            path: "{{ opensearch_conf_dir }}/localhost.key"
+            owner: "{{ opensearch_user }}"
+            group: "{{ opensearch_group }}"
+            mode: "0440"
+          body:
+            SAN:
+              - "{{ ansible_em1['ipv4'][0]['address'] }}"
+              - 127.0.0.1
+              - localhost
+              - "{{ ansible_hostname }}"
+            profile: backend
+            request:
+              CN: "{{ ansible_hostname }}"
+              hosts:
+                - "{{ ansible_em1['ipv4'][0]['address'] }}"
+                - "{{ ansible_hostname }}"
+                - 127.0.0.1
+                - localhost
+              key:
+                algo: rsa
+                size: 2048
+              names:
+                - C: US
+                  ST: California
+                  L: San Francisco
+                  O: example.com
+        - csr:
+            path: "{{ opensearch_conf_dir }}/Admin.csr"
+            owner: "{{ opensearch_user }}"
+            group: "{{ opensearch_group }}"
+            mode: "0444"
+          public:
+            path: "{{ opensearch_conf_dir }}/Admin.pem"
+            owner: "{{ opensearch_user }}"
+            group: "{{ opensearch_group }}"
+            mode: "0444"
+          private:
+            path: "{{ opensearch_conf_dir }}/Admin.key"
+            owner: "{{ opensearch_user }}"
+            group: "{{ opensearch_group }}"
+            mode: "0440"
+          body:
+            profile: agent
+            request:
+              CN: Admin
+              hosts:
+                - ""
+              key:
+                algo: rsa
+                size: 2048
+              names:
+                - C: US
+                  ST: California
+                  L: San Francisco
+                  O: example.com
+    # _____________________________________________cfssl
+    cfssl_db_migration_environment: production
+    cfssl_db_migration_config:
+      production:
+        driver: sqlite3
+        open: "{{ cfssl_db_sqlite_database_file }}"
+
+    cfssl_db_type: sqlite
+    os_cfssl_extra_packages:
+      FreeBSD: sqlite3
+    cfssl_extra_packages: "{{ os_cfssl_extra_packages[ansible_os_family] }}"
+    project_auth_key: 0123456789ABCDEF0123456789ABCDEF
+    project_auth_key_name: primary
+
+    # this test case follows the same steps described at
+    # https://docs.sensu.io/sensu-go/latest/guides/generate-certificates/
+    cfssl_ca_config:
+      auth_keys:
+        primary:
+          type: standard
+          key: "{{ project_auth_key }}"
+      signing:
+        default:
+          expiry: 17520h
+          usages:
+            - signing
+            - key encipherment
+            - client auth
+          auth_key: "{{ project_auth_key_name }}"
+        profiles:
+          backend:
+            expiry: 4320h
+            usages:
+              - signing
+              - key encipherment
+              - server auth
+              - client auth
+            auth_key: "{{ project_auth_key_name }}"
+          agent:
+            expiry: 4320h
+            usages:
+              - signing
+              - key encipherment
+              - client auth
+            auth_key: "{{ project_auth_key_name }}"
+
+    # see https://github.com/cloudflare/cfssl/tree/master/certdb/README.md
+    cfssl_db_config:
+      driver: sqlite3
+      data_source: "{{ cfssl_db_sqlite_database_file }}"
+
+    cfssl_ca_csr_config:
+      CN: Sensu Test CA
+      key:
+        algo: rsa
+        size: 2048
+    os_cfssl_flags:
+      FreeBSD: |
+
+        cfssl_flags="-db-config {{ cfssl_ca_root_dir }}/db.json -ca {{ cfssl_ca_root_dir }}/ca.pem -ca-key {{ cfssl_ca_root_dir }}/ca-key.pem -config {{ cfssl_ca_config_file }} -address {{ project_master_ip_address }}"
+      Debian: ""
+    cfssl_flags: "{{ os_cfssl_flags[ansible_os_family] }}"
+    # "

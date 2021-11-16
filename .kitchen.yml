@@ -48,11 +48,82 @@ platforms:
       box: trombik/ansible-centos-7.8-x86_64
       box_check_update: false
 
+  - name: cluster-m
+    driver:
+      box: trombik/ansible-freebsd-13.0-amd64
+      box_check_update: false
+    driver_config:
+      ssh:
+        shell: '/bin/sh'
+      network:
+        - ["private_network", {ip: "172.16.1.100"}]
+        - ["forwarded_port", {guest: 80, host: 8001}]
+    provisioner:
+      extra_vars:
+        ansible_python_interpreter: '/usr/local/bin/python3'
+
+  - name: cluster-d1
+    driver:
+      box: trombik/ansible-freebsd-13.0-amd64
+      box_check_update: false
+    driver_config:
+      ssh:
+        shell: '/bin/sh'
+      network:
+        - ["private_network", {ip: "172.16.1.101"}]
+    provisioner:
+      extra_vars:
+        ansible_python_interpreter: '/usr/local/bin/python3'
+
+  - name: cluster-d2
+    driver:
+      box: trombik/ansible-freebsd-13.0-amd64
+      box_check_update: false
+    driver_config:
+      ssh:
+        shell: '/bin/sh'
+      network:
+        - ["private_network", {ip: "172.16.1.102"}]
+    provisioner:
+      extra_vars:
+        ansible_python_interpreter: '/usr/local/bin/python3'
+
+  - name: cluster-c1
+    driver:
+      box: trombik/ansible-freebsd-13.0-amd64
+      box_check_update: false
+    driver_config:
+      ssh:
+        shell: '/bin/sh'
+      network:
+        - ["private_network", {ip: "172.16.1.200"}]
+    provisioner:
+      extra_vars:
+        ansible_python_interpreter: '/usr/local/bin/python3'
+
 suites:
   - name: default
+    excludes:
+      - cluster-m
+      - cluster-d1
+      - cluster-d2
+      - cluster-c1
     provisioner:
       name: ansible_playbook
       playbook: tests/serverspec/default.yml
     verifier:
       name: shell
       command: rspec -c -f d -I tests/serverspec tests/serverspec/default_spec.rb
+
+  - name: cluster
+    includes:
+      - cluster-m
+      - cluster-d1
+      - cluster-d2
+      - cluster-c1
+    provisioner:
+      name: ansible_playbook
+      playbook: tests/serverspec/cluster.yml
+    verifier:
+      name: shell
+      command: rspec -c -f d -I tests/serverspec tests/serverspec/cluster_spec.rb
