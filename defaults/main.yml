@@ -23,6 +23,7 @@ opensearch_http_url: https://{{ opensearch_http_host }}:{{ opensearch_http_port 
 opensearch_java_home: "{{ __opensearch_java_home }}"
 opensearch_extra_plugin_files: []
 opensearch_include_role_x509_certificate: yes
+opensearch_x509_certificate_vars: []
 opensearch_http_auth: {}
 opensearch_wait_for_cluster_status: no
 opensearch_wait_for_cluster_status_timeout: 10s

@@ -9,6 +9,7 @@ roles:
   - name: trombik.haproxy
   - name: trombik.apt_repo
   - name: trombik.redhat_repo
+  - name: trombik.cfssl
 collections:
   - name: community.general
   - name: ansible.posix
