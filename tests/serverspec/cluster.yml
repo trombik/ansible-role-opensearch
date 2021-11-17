@@ -41,7 +41,14 @@
       when:
         - ansible_hostname == project_master_hostname
   vars:
-    # An example to create a cluster of opensearch
+    # An example to create a cluster of opensearch.
+    #
+    # This example supports FreeBSD only not because it does not work on
+    # Linux, but because I don't have enough resources to test it.
+    #
+    # Hints for Linux users: most of things are not OS-specific. IP addresses,
+    # packages, some paths are. Start from tests/serverspec/default.yml, which
+    # should work on Linux distributions.
     #
     # Nodes:
     #
@@ -766,7 +773,7 @@
       data_source: "{{ cfssl_db_sqlite_database_file }}"
 
     cfssl_ca_csr_config:
-      CN: Sensu Test CA
+      CN: Test CA
       key:
         algo: rsa
         size: 2048
