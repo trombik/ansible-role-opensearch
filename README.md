@@ -50,9 +50,10 @@ expert of `systemd` in any way.
 
 # Requirements
 
-By default, the role uses `trombik.x509_certificate` to manage X509
-certificates. The role does not list `trombik.x509_certificate` as a
-dependency because TLS is not mandatory.
+By default, the role uses
+[`trombik.x509_certificate`](https://github.com/trombik/ansible-role-x509_certificate)
+to manage X509 certificates. The role does not list `trombik.x509_certificate`
+as a dependency because TLS is not mandatory.
 
 # Role Variables
 
@@ -81,6 +82,7 @@ dependency because TLS is not mandatory.
 | `opensearch_java_home` | `JAVA_HOME` environment variable | `{{ __opensearch_java_home }}` |
 | `opensearch_extra_plugin_files` | a list of extra files for plug-ins (see below) | `[]` |
 | `opensearch_include_role_x509_certificate` | if true, include `trombik.x509_certificate` during the play (`trombik.x509_certificate` must be listed in `requirements.yml`) | `yes` |
+| `opensearch_x509_certificate_vars` | a variable to pass to `trombik.x509_certificate` | `{}` |
 | `opensearch_wait_for_cluster_status` | wait for cluster status to be this value after starting the service. valid value includes `red`, `yellow`, `green`, and `false`. set `false` value to disable | `no` |
 | `opensearch_wait_for_cluster_status_timeout` | timeout when wait for cluster status to be `opensearch_wait_for_cluster_status` | `10s` |
 | `opensearch_wait_for_cluster_status_retry` | retry when wait for cluster status to be `opensearch_wait_for_cluster_status` | `3` |
