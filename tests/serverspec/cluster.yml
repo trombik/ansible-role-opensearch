@@ -183,7 +183,6 @@
       cluster-d1: true
       cluster-d2: true
       cluster-c1: false
-      cluster-c1: false
     project_node_data: "{{ hostname_project_node_data[ansible_hostname] }}"
 
     hostname_project_node_ingest:
