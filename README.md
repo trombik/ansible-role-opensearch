@@ -278,6 +278,9 @@ for more details.
 
 Use `admin` user with password `admin` to login to the dashboards.
 
+For a cluster example, see
+[tests/serverspec/cluster.yml](tests/serverspec/cluster.yml).
+
 ```yaml
 ---
 - hosts: localhost
