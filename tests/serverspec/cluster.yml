@@ -85,6 +85,8 @@
     # kitchen converge cluster
     # kitchen verify cluster
     #
+    # opensearch-dashboards is available at http://127.0.0.1:8001
+
     project_master_ip_address: 172.16.1.100
     project_master_hostname: cluster-m
     project_coordinating_ip_address: 172.16.1.200
