@@ -10,6 +10,7 @@ describe command "curl #{curl_opts} #{url}/_cat/nodes" do
   its(:stdout) { should match(/^#{Regexp.escape("172.16.1.100")}/) }
   its(:stdout) { should match(/^#{Regexp.escape("172.16.1.101")}/) }
   its(:stdout) { should match(/^#{Regexp.escape("172.16.1.102")}/) }
+  its(:stdout) { should match(/^#{Regexp.escape("172.16.1.200")}/) }
 end
 
 describe command "curl #{curl_opts} #{url}/_cluster/health" do
