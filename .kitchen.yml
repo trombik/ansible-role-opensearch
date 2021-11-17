@@ -48,7 +48,7 @@ platforms:
       box: trombik/ansible-centos-7.8-x86_64
       box_check_update: false
 
-  - name: cluster-m
+  - name: m
     driver:
       box: trombik/ansible-freebsd-13.0-amd64
       box_check_update: false
@@ -62,7 +62,7 @@ platforms:
       extra_vars:
         ansible_python_interpreter: '/usr/local/bin/python3'
 
-  - name: cluster-d1
+  - name: d1
     driver:
       box: trombik/ansible-freebsd-13.0-amd64
       box_check_update: false
@@ -75,7 +75,7 @@ platforms:
       extra_vars:
         ansible_python_interpreter: '/usr/local/bin/python3'
 
-  - name: cluster-d2
+  - name: d2
     driver:
       box: trombik/ansible-freebsd-13.0-amd64
       box_check_update: false
@@ -88,7 +88,7 @@ platforms:
       extra_vars:
         ansible_python_interpreter: '/usr/local/bin/python3'
 
-  - name: cluster-c1
+  - name: c1
     driver:
       box: trombik/ansible-freebsd-13.0-amd64
       box_check_update: false
@@ -104,10 +104,10 @@ platforms:
 suites:
   - name: default
     excludes:
-      - cluster-m
-      - cluster-d1
-      - cluster-d2
-      - cluster-c1
+      - m
+      - d1
+      - d2
+      - c1
     provisioner:
       name: ansible_playbook
       playbook: tests/serverspec/default.yml
@@ -117,10 +117,10 @@ suites:
 
   - name: cluster
     includes:
-      - cluster-m
-      - cluster-d1
-      - cluster-d2
-      - cluster-c1
+      - m
+      - d1
+      - d2
+      - c1
     provisioner:
       name: ansible_playbook
       playbook: tests/serverspec/cluster.yml

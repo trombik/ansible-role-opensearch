@@ -86,7 +86,8 @@
     # kitchen verify cluster
     #
     project_master_ip_address: 172.16.1.100
-    project_master_hostname: cluster-cluster-m
+    project_master_hostname: cluster-m
+    project_coordinating_ip_address: 172.16.1.200
     project_external_ip_address: "{{ ansible_all_ipv4_addresses[1] }}"
     # XXX use my own package as the package in the official package tree is
     # broken. note that the package depends on node10, which is EoLed and has
@@ -128,10 +129,10 @@
     sysctl: "{{ os_sysctl[ansible_os_family] }}"
 
     host_opensearch_wait_for_cluster_status:
-      cluster-cluster-m: no
-      cluster-cluster-d1: no
-      cluster-cluster-d2: no
-      cluster-cluster-c1: yellow
+      cluster-m: no
+      cluster-d1: no
+      cluster-d2: no
+      cluster-c1: yellow
     opensearch_wait_for_cluster_status: "{{ host_opensearch_wait_for_cluster_status[ansible_hostname] }}"
     os_opensearch_package:
       FreeBSD: "{{ __opensearch_package }}"
@@ -165,42 +166,32 @@
       FreeBSD:
         url_username: admin
         url_password: admin
-        ca_path: "{{ opensearch_conf_dir }}/root.pem"
+        ca_path: "{{ project_root_ca_cert_file }}"
         validate_certs: yes
     opensearch_http_auth: "{{ os_opensearch_http_auth[ansible_os_family] }}"
     opensearch_jvm_options: "{{ lookup('file', 'test/jvm_options') + os_opensearch_jvm_options[ansible_os_family] }}"
 
     hostname_project_node_master:
-      cluster-cluster-m: true
-      cluster-cluster-d1: true
-      cluster-cluster-d2: true
-      cluster-cluster-c1: false
+      cluster-m: true
+      cluster-d1: true
+      cluster-d2: true
+      cluster-c1: false
     project_node_master: "{{ hostname_project_node_master[ansible_hostname] }}"
 
     hostname_project_node_data:
-      cluster-cluster-m: false
-      cluster-cluster-d1: true
-      cluster-cluster-d2: true
-      cluster-cluster-c1: false
+      cluster-m: false
+      cluster-d1: true
+      cluster-d2: true
+      cluster-c1: false
       cluster-c1: false
     project_node_data: "{{ hostname_project_node_data[ansible_hostname] }}"
 
     hostname_project_node_ingest:
-      cluster-cluster-m: false
-      cluster-cluster-d1: true
-      cluster-cluster-d2: true
-      cluster-cluster-c1: false
+      cluster-m: false
+      cluster-d1: true
+      cluster-d2: true
+      cluster-c1: false
     project_node_ingest: "{{ hostname_project_node_ingest[ansible_hostname] }}"
-
-    hostname_project_cluster_initial_master_nodes:
-      cluster-cluster-m:
-        - 172.16.1.100
-      cluster-cluster-d1:
-        - 172.16.1.100
-      cluster-cluster-d2:
-        - 172.16.1.100
-      cluster-cluster-c1: []
-    project_cluster_initial_master_nodes: "{{ hostname_project_cluster_initial_master_nodes[ansible_hostname] }}"
 
     opensearch_config:
       node.master: "{{ project_node_master }}"
@@ -220,7 +211,7 @@
         - "{{ opensearch_http_host }}"
         - _site_
       cluster.name: test-cluster
-      cluster.initial_master_nodes: "{{ project_cluster_initial_master_nodes }}"
+      cluster.initial_master_nodes: "{{ project_master_ip_address }}"
       node.name: "{{ ansible_em1['ipv4'][0]['address'] }}"
       http.cors.enabled: "true"
       http.cors.allow-origin: "*"
@@ -240,13 +231,13 @@
       plugins.security.allow_unsafe_democertificates: false
       plugins.security.allow_default_init_securityindex: true
       plugins.security.authcz.admin_dn:
-        - CN=Admin,O=example.com,L=San Francisco,ST=California,C=US
+        - "CN={{ project_admin_cn }},O=example.com,L=San Francisco,ST=California,C=US"
       # Subject: C = US, ST = California, L = San Francisco, O = example.com, CN = 172.16.1.101
       plugins.security.nodes_dn:
-        - CN=cluster-cluster-m,O=example.com,L=San Francisco,ST=California,C=US
-        - CN=cluster-cluster-d1,O=example.com,L=San Francisco,ST=California,C=US
-        - CN=cluster-cluster-d2,O=example.com,L=San Francisco,ST=California,C=US
-        - CN=cluster-cluster-c1,O=example.com,L=San Francisco,ST=California,C=US
+        - CN=cluster-m,O=example.com,L=San Francisco,ST=California,C=US
+        - CN=cluster-d1,O=example.com,L=San Francisco,ST=California,C=US
+        - CN=cluster-d2,O=example.com,L=San Francisco,ST=California,C=US
+        - CN=cluster-c1,O=example.com,L=San Francisco,ST=California,C=US
       plugins.security.advanced_modules_enabled: false
       plugins.security.audit.type: internal_opensearch
       plugins.security.enable_snapshot_restore_privilege: true
@@ -258,13 +249,18 @@
       plugins.security.disabled: false
       cluster.routing.allocation.disk.threshold_enabled: false
 
+    project_admin_cn: Admin
+    project_admin_key_pkcs8_file: "{{ opensearch_conf_dir }}/{{ project_admin_cn }}.pkcs8"
+    project_admin_key_file: "{{ opensearch_conf_dir }}/{{ project_admin_cn }}.key"
+    project_admin_cert_file: "{{ opensearch_conf_dir }}/{{ project_admin_cn }}.pem"
+    project_root_ca_cert_file: "{{ opensearch_conf_dir }}/root.pem"
     project_security_plugin_dir: "{{ opensearch_plugins_dir }}/opensearch-security"
     project_securityadmin_bin: "{{ project_security_plugin_dir }}/tools/securityadmin.sh"
     project_security_plugin_post_command:
-      cmd: "{{ project_securityadmin_bin }} -icl -cacert {{ opensearch_conf_dir }}/root.pem -cert {{ opensearch_conf_dir }}/Admin.pem -key {{ opensearch_conf_dir }}/Admin.pkcs8 -h 172.16.1.200"
+      cmd: "{{ project_securityadmin_bin }} -icl -cacert {{ project_root_ca_cert_file }} -cert {{ project_admin_cert_file }} -key {{ project_admin_key_pkcs8_file }} -h {{ project_coordinating_ip_address }}"
       args:
         chdir: "{{ project_security_plugin_dir }}/securityconfig"
-      enabled: "{% if ansible_hostname == 'cluster-cluster-c1' %}yes{% else %}no{% endif %}"
+      enabled: "{% if ansible_hostname == 'cluster-c1' %}yes{% else %}no{% endif %}"
 
     opensearch_plugins: []
     opensearch_extra_plugin_files:
@@ -344,7 +340,7 @@
       # Use this setting if you are running kibana without https
       opensearch_security.cookie.secure: false
     # _____________________________________________haproxy
-    project_backend_host: 172.16.1.200
+    project_backend_host: 127.0.0.1
     project_backend_port: 5601
     os_haproxy_selinux_seport:
       FreeBSD: {}
@@ -554,7 +550,7 @@
           <label @forward>
             <match **>
               @type elasticsearch
-              host 172.16.1.200
+              host "{{ project_coordinating_ip_address }}"
               port 9200
               scheme https
               ssl_version TLSv1_2
@@ -570,7 +566,7 @@
               # are logged in the log file. you probably want to set this to
               # false in production.
               with_transporter_log true
-              ca_file {{ opensearch_conf_dir }}/root-ca.pem
+              ca_file {{ project_root_ca_cert_file }}
               ssl_verify true
               logstash_format true
               # XXX a workaround to use opensearch with elasticsearch output
@@ -631,7 +627,7 @@
     opensearch_x509_certificate_vars:
       x509_certificate_debug_log: yes
       x509_certificate_cfssl_info:
-        - path: "{{ opensearch_conf_dir }}/root.pem"
+        - path: "{{ project_root_ca_cert_file }}"
           body:
             label: primary
             profile: default
@@ -643,8 +639,8 @@
           owner: "{{ opensearch_user }}"
           group: "{{ opensearch_group }}"
           mode: "0440"
-        - cmd: "openssl pkcs8 -inform pem -outform pem -topk8 -nocrypt -v1 PBE-SHA1-3DES -in {{ opensearch_conf_dir }}/Admin.key -out {{ opensearch_conf_dir }}/Admin.pkcs8"
-          creates: "{{ opensearch_conf_dir }}/Admin.pkcs8"
+        - cmd: "openssl pkcs8 -inform pem -outform pem -topk8 -nocrypt -v1 PBE-SHA1-3DES -in {{ project_admin_key_file }} -out {{ project_admin_key_pkcs8_file }}"
+          creates: "{{ project_admin_key_pkcs8_file }}"
           owner: "{{ opensearch_user }}"
           group: "{{ opensearch_group }}"
           mode: "0440"
@@ -689,24 +685,24 @@
                   L: San Francisco
                   O: example.com
         - csr:
-            path: "{{ opensearch_conf_dir }}/Admin.csr"
+            path: "{{ opensearch_conf_dir }}/{{ project_admin_cn }}.csr"
             owner: "{{ opensearch_user }}"
             group: "{{ opensearch_group }}"
             mode: "0444"
           public:
-            path: "{{ opensearch_conf_dir }}/Admin.pem"
+            path: "{{ project_admin_cert_file }}"
             owner: "{{ opensearch_user }}"
             group: "{{ opensearch_group }}"
             mode: "0444"
           private:
-            path: "{{ opensearch_conf_dir }}/Admin.key"
+            path: "{{ project_admin_key_file }}"
             owner: "{{ opensearch_user }}"
             group: "{{ opensearch_group }}"
             mode: "0440"
           body:
             profile: agent
             request:
-              CN: Admin
+              CN: "{{ project_admin_cn }}"
               hosts:
                 - ""
               key:
