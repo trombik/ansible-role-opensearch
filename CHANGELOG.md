@@ -1,3 +1,13 @@
+## Release 2.0.1
+
+ * 1ac518f ci: add missing test for c1
+ * bb0d3d0 doc: document opensearch_x509_certificate_vars
+ * 83d87b7 bugfix: remove duplicated key
+ * 51472df doc: mention cluser example
+ * 96fe266 bugfix: refactor cluster tests
+ * 67420ed ci: initial cluster support
+ * c79c3b1 LimitMEMLOCK=unlimited should be LimitMEMLOCK=infinity (unlimited used on commandline with ulimit -l unlimited).
+
 ## Release 2.0.0
 
 The initial release as `trombik.opensearch`. This role is the successor of
