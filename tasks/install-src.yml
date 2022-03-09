@@ -102,9 +102,7 @@
   with_items:
     - "{{ opensearch_plugins_dir }}/opensearch-security/tools/securityadmin.sh"
     - "{{ opensearch_plugins_dir }}/opensearch-security/tools/hash.sh"
-    - "{{ opensearch_plugins_dir }}/opensearch-performance-analyzer/performance-analyzer-rca/bin/performance-analyzer-rca"
     - "{{ opensearch_plugins_dir }}/opensearch-performance-analyzer/pa_bin/performance-analyzer-agent"
-    - "{{ opensearch_plugins_dir }}/opensearch-knn/knnlib/libKNNIndexV2_0_11.so"
 
 - name: Create opensearch_log_dir
   ansible.builtin.file:
