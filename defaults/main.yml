@@ -33,7 +33,7 @@ opensearch_root_dir: "{{ __opensearch_root_dir }}"
 opensearch_src_baseurl: "https://artifacts.opensearch.org/releases/bundle/opensearch/{{ opensearch_src_dist_version }}"
 opensearch_src_dir: "/var/dist"
 opensearch_src_dist_name: "opensearch-{{ opensearch_src_dist_version }}"
-opensearch_src_dist_version: 1.1.0
+opensearch_src_dist_version: 1.2.4
 opensearch_src_file: "{{ opensearch_src_dir }}/{{ opensearch_src_dist_name }}-linux-x64.tar.gz"
 opensearch_src_gitnature_url: "{{ opensearch_src_baseurl }}/opensearch-{{ opensearch_src_dist_version }}-linux-x64.tar.gz.sig"
 opensearch_src_pgp_key_file: "{{ opensearch_src_dir }}/opensearch.pgp"
