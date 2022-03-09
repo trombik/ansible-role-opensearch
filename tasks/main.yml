@@ -5,7 +5,7 @@
   include_vars: "{{ ansible_os_family }}.yml"
 
 - name: "Include install-{{ ansible_os_family }}.yml"
-  include: "install-{{ ansible_os_family }}.yml"
+  include_tasks: "install-{{ ansible_os_family }}.yml"
 
 - name: Include trombik.x509_certificate if opensearch_include_role_x509_certificate is true
   include_role:
