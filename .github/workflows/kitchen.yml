@@ -1,0 +1,131 @@
+---
+name: kitchen
+on:
+  - pull_request
+  - push
+jobs:
+  pre_build:
+
+    # A job to see if the entrire jobs should be skipped.
+    runs-on: ubuntu-latest
+    outputs:
+      should_skip: ${{ steps.skip_check.outputs.should_skip }}
+    steps:
+      - id: skip_check
+        uses: fkirc/skip-duplicate-actions@v3.4.1
+        with:
+          concurrent_skipping: same_content
+          skip_after_successful_duplicate: 'true'
+          paths_ignore: '["**/*.md", "**/docs/**"]'
+          do_not_skip: '["pull_request", "workflow_dispatch", "schedule"]'
+
+  lint:
+    needs: pre_build
+    if: ${{ needs.pre_build.outputs.should_skip != 'true' || github.ref_name == 'main' || github.ref_name == 'master' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Lint Ansible Playbook
+        # XXX use SHA instead of tag. existing tags in releases page do not
+        # work. ansible-lint-action deliverately does not tag the repository.
+        #
+        # https://github.com/ansible/ansible-lint-action/issues/45
+        uses: ansible/ansible-lint-action@c37fb7b4bda2c8cb18f4942716bae9f11b0dc9bc
+        with:
+          targets: ""
+          # XXX workaround a bug mentioned in:
+          # https://github.com/ansible/ansible-lint-action/issues/59
+          #
+          # ImportError: cannot import name 'render_group' from 'rich.console'
+          override-deps: |
+            ansible-lint==5.3.2
+
+  list:
+    needs:
+      - pre_build
+      - lint
+    # always run CI in main (or master) branch so that cache in main can be
+    # reused in pull_request or push. this reduces the number of box download.
+    # vagrant cloud throttles requests after many download requests.
+    if: ${{ needs.pre_build.outputs.should_skip != 'true' || github.ref_name == 'main' || github.ref_name == 'master' }}
+    runs-on: macos-10.15
+    outputs:
+      instances: ${{ steps.set-instances.outputs.instances }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Install ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: 2.7
+          bundler-cache: true
+
+      - name: Set instances for matrix build
+        id: set-instances
+        run: |
+          echo ::set-output name=instances::$(bundle exec kitchen list -j | jq --compact-output 'map(.instance)')
+
+  kitchen:
+    runs-on: macos-10.15
+    needs:
+      - pre_build
+      - list
+    if: ${{ needs.pre_build.outputs.should_skip != 'true' || github.ref_name == 'main' || github.ref_name == 'master' }}
+    strategy:
+      matrix:
+        instance: ${{ fromJSON(needs.list.outputs.instances) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Install ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: 2.7
+          bundler-cache: true
+
+      - name: Cache vagrant boxes
+        uses: actions/cache@v2
+        env:
+          cache-name: vagrant-boxes
+        with:
+          path: ~/.vagrant.d/boxes/
+          # XXX using .kitchen.yml as cache key is not very efficient because
+          # the file has other configuration options, such as log level, and
+          # when you change options not related to vagrant boxes, cache
+          # becomes invalid.
+          key: vagrant-boxes-${{ hashFiles('**/.kitchen.yml') }}-${{ matrix.instance }}
+          restore-keys: |
+            vagrant-boxes-${{ hashFiles('**/.kitchen.yml') }}-${{ matrix.instance }}
+
+      - name: Show vagrant version
+        run: |
+          Vagrant --version
+
+      - name: Show VirtualBox version
+        run: |
+          virtualbox -h
+
+      - name: Run test-kitchen
+        run: |
+          bundle exec kitchen test ${{ matrix.instance }}
+  all_build:
+    # a meta job that requires all of the above so that repository
+    # admin can choose a single test name in "Require status checks to pass
+    # before merging". A trick obtained from:
+    #
+    # https://github.com/jazzband/pip-tools/issues/1085#issuecomment-619172509
+    name: All build
+    runs-on: ubuntu-latest
+    needs:
+      - pre_build
+      - lint
+      - list
+      - kitchen
+    steps:
+      - name:
+        run: |
+          echo "All builds finished"
