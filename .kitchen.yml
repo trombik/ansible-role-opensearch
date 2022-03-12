@@ -56,7 +56,7 @@ platforms:
       ssh:
         shell: '/bin/sh'
       network:
-        - ["private_network", {ip: "172.16.1.100"}]
+        - ["private_network", {ip: "192.168.56.100"}]
         - ["forwarded_port", {guest: 80, host: 8001}]
     provisioner:
       extra_vars:
@@ -70,7 +70,7 @@ platforms:
       ssh:
         shell: '/bin/sh'
       network:
-        - ["private_network", {ip: "172.16.1.101"}]
+        - ["private_network", {ip: "192.168.56.101"}]
     provisioner:
       extra_vars:
         ansible_python_interpreter: '/usr/local/bin/python3'
@@ -83,7 +83,7 @@ platforms:
       ssh:
         shell: '/bin/sh'
       network:
-        - ["private_network", {ip: "172.16.1.102"}]
+        - ["private_network", {ip: "192.168.56.102"}]
     provisioner:
       extra_vars:
         ansible_python_interpreter: '/usr/local/bin/python3'
@@ -96,7 +96,7 @@ platforms:
       ssh:
         shell: '/bin/sh'
       network:
-        - ["private_network", {ip: "172.16.1.200"}]
+        - ["private_network", {ip: "192.168.56.200"}]
     provisioner:
       extra_vars:
         ansible_python_interpreter: '/usr/local/bin/python3'
