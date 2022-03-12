@@ -28,7 +28,7 @@
   register: __register_opensearch_get_url_pgp_key
 
 - name: Delete all files of opensearch_src_tasks_file when PGP key is downloaded
-  ansible.builtin.file:
+  ansible.builtin.file:  # noqa no-handler
     path: "{{ opensearch_src_tasks_file[item] }}"
     state: absent
   with_items: "{{ opensearch_src_tasks_file.keys() | list }}"
@@ -85,7 +85,7 @@
     mode: "0755"
 
 - name: Do unarchive opensearch_src_file
-  shell:
+  shell:  # noqa command-instead-of-module
     # XXX use `opensearch` as default owner and group.
     # opensearch is not a good Unix citizen. it expects all directories
     # and files are owned by opensearch user, including config directories.
@@ -118,6 +118,7 @@
   ansible.builtin.template:
     src: systemd.unit.j2
     dest: "/lib/systemd/system/{{ opensearch_service }}.service"
+    mode: "0644"
   register: __register_opensearch_systemd_unit_file
   notify:
     - Restart opensearch
@@ -129,7 +130,7 @@
     state: link
 
 - name: Reload systemd
-  ansible.builtin.systemd:
+  ansible.builtin.systemd:  # noqa no-handler
     daemon_reload: yes
   when:
     - __register_opensearch_systemd_unit_file['changed']
