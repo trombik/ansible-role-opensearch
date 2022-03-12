@@ -7,10 +7,10 @@ curl_opts = "-v --user admin:admin --cacert /usr/local/etc/opensearch/root.pem"
 describe command "curl #{curl_opts} #{url}/_cat/nodes" do
   its(:exit_status) { should eq 0 }
   its(:stderr) { should match(%r{HTTP/1.1 200 OK}) }
-  its(:stdout) { should match(/^#{Regexp.escape("172.16.1.100")}/) }
-  its(:stdout) { should match(/^#{Regexp.escape("172.16.1.101")}/) }
-  its(:stdout) { should match(/^#{Regexp.escape("172.16.1.102")}/) }
-  its(:stdout) { should match(/^#{Regexp.escape("172.16.1.200")}/) }
+  its(:stdout) { should match(/^#{Regexp.escape("192.168.56.100")}/) }
+  its(:stdout) { should match(/^#{Regexp.escape("192.168.56.101")}/) }
+  its(:stdout) { should match(/^#{Regexp.escape("192.168.56.102")}/) }
+  its(:stdout) { should match(/^#{Regexp.escape("192.168.56.200")}/) }
 end
 
 describe command "curl #{curl_opts} #{url}/_cluster/health" do

@@ -84,7 +84,7 @@
     #
     # as `test-kitchen` does not support multi-nodes, each nodes has an extra
     # private network interface for cluster communication. the subnet is
-    # 172.16.1.0/24.
+    # 192.168.56.0/24.
     #
     # `kitchen test` does not work because each node requires others for the
     # test. instead, run:
@@ -94,9 +94,9 @@
     #
     # opensearch-dashboards is available at http://127.0.0.1:8001
 
-    project_master_ip_address: 172.16.1.100
+    project_master_ip_address: 192.168.56.100
     project_master_hostname: cluster-m
-    project_coordinating_ip_address: 172.16.1.200
+    project_coordinating_ip_address: 192.168.56.200
     project_external_ip_address: "{{ ansible_all_ipv4_addresses[1] }}"
     # XXX use my own package as the package in the official package tree is
     # broken. note that the package depends on node10, which is EoLed and has
@@ -206,9 +206,9 @@
       node.data: "{{ project_node_data }}"
       node.ingest: "{{ project_node_ingest }}"
       discovery.seed_hosts:
-        - 172.16.1.100
-        - 172.16.1.101
-        - 172.16.1.102
+        - 192.168.56.100
+        - 192.168.56.101
+        - 192.168.56.102
       network.publish_host:
         - "{{ project_external_ip_address }}"
       path.data: "{{ opensearch_db_dir }}"
@@ -240,7 +240,7 @@
       plugins.security.allow_default_init_securityindex: true
       plugins.security.authcz.admin_dn:
         - "CN={{ project_admin_cn }},O=example.com,L=San Francisco,ST=California,C=US"
-      # Subject: C = US, ST = California, L = San Francisco, O = example.com, CN = 172.16.1.101
+      # Subject: C = US, ST = California, L = San Francisco, O = example.com, CN = 192.168.56.101
       plugins.security.nodes_dn:
         - CN=cluster-m,O=example.com,L=San Francisco,ST=California,C=US
         - CN=cluster-d1,O=example.com,L=San Francisco,ST=California,C=US
