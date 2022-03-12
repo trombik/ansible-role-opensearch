@@ -81,7 +81,7 @@
     - Restart opensearch
 
 - name: Register installed plugins
-  shell: "{{ opensearch_plugin_command }} list"
+  ansible.builtin.command: "{{ opensearch_plugin_command }} list"
   environment:
     JAVA_HOME: "{{ opensearch_java_home }}"
   register: shell_output
@@ -96,7 +96,7 @@
     state: directory
 
 - name: Install plugins
-  command: "{{ opensearch_plugin_command }} install --batch {% if 'src' in item %}{{ item.src }}{% else %}{{ item.name }}{% endif %}"
+  ansible.builtin.command: "{{ opensearch_plugin_command }} install --batch {% if 'src' in item %}{{ item.src }}{% else %}{{ item.name }}{% endif %}"
   environment:
     JAVA_HOME: "{{ opensearch_java_home }}"
   with_items: "{{ opensearch_plugins }}"
@@ -143,7 +143,7 @@
   register: register_opensearch_start
 
 - name: Wait for opensearch to start in task
-  ansible.builtin.wait_for:
+  ansible.builtin.wait_for: # noqa no-handler
     host: "{{ opensearch_http_host }}"
     port: "{{ opensearch_http_port }}"
   when:
@@ -180,7 +180,7 @@
   # to run once to update all files.
   #
   # XXX do not use FQCN here for older ansible version on Ubuntu
-  command:
+  ansible.builtin.command:  # noqa no-handler
     cmd: "{{ item['item']['post_command']['cmd'] }}"
   args:
     # XXX i do not want to hard-code `chdir` and others here, but ansile complains.
@@ -193,6 +193,6 @@
     JAVA_HOME: "{{ opensearch_java_home }}"
   with_items: "{{ __register_opensearch_extra_plugin_files_create['results'] }}"
   when:
-    - item['changed'] == true
+    - item['changed']
     - "'post_command' in item['item']"
     - item['item']['post_command']['enabled'] | bool
