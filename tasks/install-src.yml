@@ -4,6 +4,7 @@
 - name: Create opensearch_group
   ansible.builtin.group:
     name: "{{ opensearch_group }}"
+    system: yes
 
 - name: Create opensearch_user
   ansible.builtin.user:
